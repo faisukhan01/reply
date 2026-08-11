@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, Bot, MessageSquare, BarChart3, Zap, Shield, Globe, Code2, ArrowRight, Check, Star } from "lucide-react";
+import { Sparkles, Bot, MessageSquare, BarChart3, Zap, Shield, Globe, Code2, ArrowRight, Check, Star, Wand2, Command } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -31,6 +31,18 @@ const features = [
     title: "Embed in 30 seconds",
     desc: "One line of script. Works on any website — WordPress, Shopify, custom. Customize colors, position, and personality.",
     color: "from-amber-500 to-orange-600",
+  },
+  {
+    icon: Wand2,
+    title: "AI summary & suggestions",
+    desc: "Every conversation gets an instant AI summary. Agents get 3 suggested replies to pick from — cut response time by 70%.",
+    color: "from-violet-500 to-fuchsia-600",
+  },
+  {
+    icon: Command,
+    title: "Built for speed",
+    desc: "Command palette (⌘K), quick replies, dark mode, real-time sync. Your team will move faster than ever.",
+    color: "from-purple-500 to-violet-600",
   },
 ];
 
@@ -103,21 +115,21 @@ export default function LandingPage() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-16 md:py-24 grid lg:grid-cols-2 gap-10 items-center relative">
-          <div className="space-y-7 text-center lg:text-left">
-            <Badge variant="secondary" className="px-3 py-1.5 text-xs font-medium gap-1.5">
+          <div className="space-y-7 text-center lg:text-left animate-fade-in-up">
+            <Badge variant="secondary" className="px-3 py-1.5 text-xs font-medium gap-1.5 animate-gradient bg-gradient-to-r from-violet-100 via-fuchsia-100 to-violet-100 dark:from-violet-950/40 dark:via-fuchsia-950/40 dark:to-violet-950/40 border-violet-200 dark:border-violet-800">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              New: AI voice receptionist now in beta
+              New: AI Summary & Reply Suggestions now live
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               Your AI support agent that{" "}
-              <span className="gradient-text">never sleeps</span>.
+              <span className="gradient-text animate-gradient">never sleeps</span>.
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
               Deploy an AI chatbot that answers your customers instantly — trained on your
               knowledge base, available 24/7, with seamless human handoff. Set it up in minutes.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-              <Button size="lg" asChild className="h-12 text-base shadow-lg shadow-violet-500/25">
+              <Button size="lg" asChild className="h-12 text-base shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-[1.02] transition-all">
                 <Link href="/signup">
                   Start free trial <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -184,7 +196,7 @@ export default function LandingPage() {
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <Card key={f.title} className="p-6 hover:shadow-lg transition-shadow group">
+              <Card key={f.title} className="p-6 hover:shadow-lg hover-lift transition-all group border-border/60">
                 <div className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${f.color} text-white mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
                   <Icon className="h-6 w-6" />
                 </div>

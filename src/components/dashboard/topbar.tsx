@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Menu, Search, Bell, LogOut, Settings, Sparkles, ChevronDown } from "lucide-react";
+import { Menu, LogOut, Settings, Sparkles, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { NotificationsBell } from "@/components/dashboard/notifications-bell";
+import { CommandPalette } from "@/components/dashboard/command-palette";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,19 +85,11 @@ export function Topbar({ userName, orgName }: { userName: string; orgName: strin
         </p>
       </div>
 
-      {/* Search */}
-      <div className="hidden lg:flex items-center w-64 relative">
-        <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search conversations..."
-          className="pl-9 h-9 bg-muted/50 border-transparent focus-visible:border-border"
-        />
-      </div>
+      {/* Command palette trigger (desktop) */}
+      <CommandPalette />
 
-      <Button variant="ghost" size="icon" className="relative">
-        <Bell className="h-[18px] w-[18px]" />
-        <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500" />
-      </Button>
+      <NotificationsBell />
+      <ThemeToggle />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

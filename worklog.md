@@ -245,3 +245,88 @@ Stage Summary:
 - Golden path works: visitor chats with widget → AI replies using knowledge base → conversation lands in live inbox → agent can view/take over.
 - All 7 dashboard pages render with real data. AI brain (z-ai-web-dev-sdk) responds intelligently.
 - Demo login: demo@replyai.app / demo1234
+
+---
+Task ID: CRON-REVIEW-1
+Agent: main (orchestrator) — webDevReview cron round
+Task: QA testing + bug fixes + new features + styling polish
+
+## Current Project Status Assessment
+ReplyAI (AI Customer Support SaaS) was fully built and verified in prior rounds. All 7 dashboard pages, auth, real-time inbox, embeddable widget, and AI chatbot were working. This round focused on: (1) QA testing, (2) fixing a seed-data time bug, (3) adding 6 new high-value features, and (4) styling polish.
+
+## Completed Modifications
+
+### QA & Bug Fixes
+- **Fixed seed time bug**: `daysAgo(0)` in seed script could generate future timestamps (random hour > current hour), causing "in X hours" display in inbox. Rewrote to guarantee past timestamps. Re-seeded DB.
+- Verified all pages load with zero console errors via agent-browser.
+- Dev server process management: sandbox was killing background `bun run dev` processes (tee pipe + session detachment issue). Stabilized using `setsid bash -c 'exec node ... next dev'` pattern.
+
+### New Features (6 added)
+
+1. **Dark Mode Toggle** (`src/components/dashboard/theme-toggle.tsx`)
+   - Animated Sun/Moon icon swap in topbar. Uses next-themes (provider already existed).
+   - Persists choice, respects system preference, no hydration mismatch.
+
+2. **AI Conversation Summary** (`src/app/api/conversations/[id]/summary/route.ts` + UI)
+   - "AI Summary" button in conversation header. POST generates a 2-3 sentence summary via z-ai-web-dev-sdk.
+   - Summary persisted on Conversation record (no re-generation needed).
+   - Collapsible gradient panel between header and messages.
+   - Added `generateConversationSummary()` to `src/lib/ai.ts`.
+
+3. **AI Reply Suggestions** (`src/app/api/conversations/[id]/suggestions/route.ts` + UI)
+   - Auto-loads 3 suggested replies when opening a conversation (uses knowledge base + FAQ context).
+   - "Refresh" button to regenerate. Clicking a suggestion fills the composer.
+   - Robust parsing: strips "REPLY1"/"Option 1"/numbering prefixes, filters short/invalid lines.
+   - Added `generateReplySuggestions()` to `src/lib/ai.ts`.
+
+4. **Command Palette (⌘K)** (`src/components/dashboard/command-palette.tsx`)
+   - Global ⌘K/Ctrl+K shortcut. Quick Actions, Navigation (7 pages), Theme toggle, Help.
+   - Replaces static search input in topbar with a clickable trigger showing ⌘K hint.
+
+5. **Canned/Quick Replies** (`src/app/api/canned-responses/route.ts` + UI)
+   - New `CannedResponse` Prisma model (org-scoped, with shortcut field).
+   - Zap icon button in inbox composer opens dropdown of saved replies.
+   - 6 default canned responses seeded (Greeting, Ask for email, Refund info, Escalate, Closing, Pricing).
+   - GET/POST/DELETE APIs.
+
+6. **Notifications Dropdown** (`src/app/api/notifications/route.ts` + `notifications-bell.tsx`)
+   - Real recent activity from DB (last 6 conversations with type: new_message/ai_reply/takeover).
+   - Unread badge count (conversations updated in last 10 min, not closed).
+   - Auto-refreshes every 30s. Clicking a notification opens the conversation.
+   - Replaces static bell icon in topbar.
+
+### Styling Polish
+- Added 5 new CSS animations to `globals.css`: `animate-gradient` (shifting gradient), `animate-fade-in-up`, `animate-pulse-glow`, `shimmer`, `hover-lift`.
+- Landing page hero: animated gradient badge, fade-in-up on hero text, animated gradient on "never sleeps" text, hover scale on CTA button.
+- Feature cards: hover-lift + shadow transition.
+- Added 2 new feature cards to landing page: "AI summary & suggestions" (Wand2 icon) and "Built for speed" (Command icon) — now 6 features total.
+- Updated hero badge text: "New: AI Summary & Reply Suggestions now live".
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- agent-browser QA:
+  - Login → dashboard → conversations: all load with zero errors ✅
+  - AI Summary: clicked button → generated "The visitor inquired about business hours. The information was provided: Monday to Friday, 9 AM to 6 PM, with AI assistance available 24/7. No further action items needed." ✅
+  - AI Reply Suggestions: 3 suggestions appeared, auto-loaded on conversation open ✅
+  - Quick Replies dropdown: 6 canned responses with shortcuts visible ✅
+  - Command Palette (Ctrl+K): opens with Quick Actions, Navigation, Theme, Help sections ✅
+  - Dark mode toggle: `document.documentElement.className` → "dark" ✅
+  - Notifications dropdown: real visitor names, types, previews, time-ago ✅
+  - Seed time bug fixed: "about 12 hours ago" instead of "in 12 hours" ✅
+  - Landing page: 6 feature cards, animated hero ✅
+- Dev server: port 3000 running. Realtime service: port 3001 running.
+- No console errors or runtime errors during entire test session.
+
+## Unresolved Issues / Risks
+1. **Dev server stability**: The sandbox occasionally kills background `bun run dev` processes. Mitigated with `setsid + exec` pattern but may recur. The system auto-manages dev server startup per instructions.
+2. **AI suggestion parsing**: The LLM occasionally returns "REPLY1"/"REPLY2" labels despite instructions. Added robust regex stripping, but edge cases may exist. Fallback suggestions are always returned.
+3. **Assign dropdown in inbox**: Still a demo (only "Unassign" wired). Team member list is a placeholder.
+4. **Org-level socket room**: `join:org` is implemented in the realtime service but the inbox doesn't emit it yet — cross-conversation live updates rely on 10s polling fallback.
+
+## Priority Recommendations for Next Phase
+1. **Add a "Saved Replies" management page** under Settings (CRUD for canned responses — currently only API exists, no UI to add/edit/delete from the app).
+2. **Wire up the Assign dropdown** to actual team members (fetch from `/api/settings` members list).
+3. **Add conversation satisfaction survey** in the widget after closing a conversation (star rating → updates Conversation.satisfaction).
+4. **Add visitor info panel** in inbox (browser, location, visit history, current page).
+5. **Add CSV/PDF export** for conversations and analytics reports.
+6. **Emit `join:org`** in the inbox for true cross-conversation real-time updates (eliminate polling).

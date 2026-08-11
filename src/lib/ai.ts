@@ -99,3 +99,120 @@ export async function generateReply(
     return "I'm having trouble connecting to my brain right now. A human agent will be with you shortly. Could you share your email so we can follow up?";
   }
 }
+
+/**
+ * Generate a short AI summary of a conversation (for agents in the inbox).
+ * Returns a concise paragraph covering: what the visitor wanted, the outcome, and any action items.
+ */
+export async function generateConversationSummary(
+  chatbot: Pick<Chatbot, "name">,
+  messages: Message[]
+): Promise<string> {
+  if (messages.length === 0) return "No messages in this conversation yet.";
+
+  const transcript = messages
+    .map((m) => `${m.role === "VISITOR" ? "Visitor" : m.role === "AI" ? "AI" : "Agent"}: ${m.content}`)
+    .join("\n");
+
+  const systemPrompt =
+    "You are an assistant that writes concise summaries of customer support conversations for human agents. " +
+    "Summarize in 2-3 sentences: (1) what the visitor wanted, (2) what was resolved or is still pending, " +
+    "and (3) any action items for the agent. Be factual and brief. Do not add opinions.";
+
+  const userPrompt = `Chatbot: ${chatbot.name}\n\nConversation transcript:\n${transcript}\n\nWrite the summary now.`;
+
+  try {
+    const zai = await getZAI();
+    const res = await zai.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      stream: false,
+    });
+    return (
+      res?.choices?.[0]?.message?.content?.trim() ||
+      "Unable to generate a summary for this conversation."
+    );
+  } catch (e) {
+    console.error("[ai] generateConversationSummary failed:", e);
+    return "Summary temporarily unavailable. Please read the conversation transcript directly.";
+  }
+}
+
+/**
+ * Generate 3 suggested reply options for a human agent, based on the conversation so far
+ * and the chatbot's knowledge base. Each suggestion is a short, ready-to-send reply.
+ */
+export async function generateReplySuggestions(
+  chatbot: Chatbot & { knowledge: KnowledgeDoc[]; faqs: FAQ[] },
+  messages: Message[]
+): Promise<string[]> {
+  if (messages.length === 0) {
+    return [
+      "Hi! Thanks for reaching out. How can I help you today?",
+      "Hello! I'd be happy to assist. Could you share a bit more about what you need?",
+      "Hey there! What can I do for you?",
+    ];
+  }
+
+  const transcript = messages
+    .slice(-12)
+    .map((m) => `${m.role === "VISITOR" ? "Visitor" : m.role === "AI" ? "AI Assistant" : "Agent"}: ${m.content}`)
+    .join("\n");
+
+  const kbContext =
+    chatbot.faqs.length > 0 || chatbot.knowledge.length > 0
+      ? "\n\nReference info:\n" +
+        chatbot.faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n") +
+        "\n" +
+        chatbot.knowledge.map((k) => `[${k.title}] ${k.content}`).join("\n")
+      : "";
+
+  const systemPrompt =
+    "You are an assistant that helps human support agents write replies. " +
+    "Given the conversation so far and the reference info, write 3 DIFFERENT reply options the agent could send next. " +
+    "Each reply should be 1-3 sentences, friendly, professional, and directly address the visitor's last message. " +
+    "Use the reference info when relevant. Do not invent facts not in the reference info. " +
+    'Return EXACTLY in this format (one reply per line, no numbering, no quotes):\nREPLY1\nREPLY2\nREPLY3';
+
+  const userPrompt = `Conversation so far:\n${transcript}${kbContext}\n\nWrite 3 reply options now.`;
+
+  try {
+    const zai = await getZAI();
+    const res = await zai.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      stream: false,
+    });
+    const raw = res?.choices?.[0]?.message?.content?.trim() || "";
+    const replies = raw
+      .split("\n")
+      .map((l: string) =>
+        l
+          .replace(/^[-*\d.)\]\s]+/, "")
+          .replace(/^(REPLY\s*\d*|Option\s*\d*|Suggestion\s*\d*)\s*[:\-]?\s*/i, "")
+          .trim()
+      )
+      .filter((l: string) => l.length > 10 && !/^REPLY\d*$/i.test(l))
+      .slice(0, 3);
+    if (replies.length === 0) {
+      return [
+        "Thanks for your message! Let me look into this for you right away.",
+        "I understand — could you share a bit more detail so I can help precisely?",
+        "Great question! Here's what I can tell you...",
+      ];
+    }
+    while (replies.length < 3) replies.push(replies[replies.length - 1]);
+    return replies;
+  } catch (e) {
+    console.error("[ai] generateReplySuggestions failed:", e);
+    return [
+      "Thanks for reaching out! I'm looking into this now and will get back to you shortly.",
+      "I'd be happy to help with that. Could you share your account email so I can check?",
+      "Got it — let me find the right answer for you.",
+    ];
+  }
+}

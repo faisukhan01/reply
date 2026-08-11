@@ -46,8 +46,20 @@ function randomFrom<T>(arr: T[]): T {
 function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  d.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
-  return d;
+  // Ensure the time is always in the past (avoid "in X hours" display bug)
+  const nowMs = Date.now();
+  let ms = d.getTime();
+  if (n === 0) {
+    // today: pick a random time earlier than now
+    const offsetMs = Math.floor(Math.random() * 12 * 3600 * 1000); // up to 12h ago
+    ms = nowMs - offsetMs;
+  } else {
+    // previous days: random hour/minute is fine
+    d.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
+    ms = d.getTime();
+    if (ms > nowMs) ms = nowMs - Math.floor(Math.random() * 3600 * 1000);
+  }
+  return new Date(ms);
 }
 
 async function main() {
@@ -160,7 +172,20 @@ async function main() {
     }
   }
 
-  console.log(`✅ Seeded: 1 org, 1 chatbot, 28 conversations, ${totalMessages} messages, contacts.`);
+  // Seed canned responses
+  const canned = [
+    { title: "Greeting", content: "Hi there! 👋 Thanks for reaching out. How can I help you today?", shortcut: "/hi" },
+    { title: "Ask for email", content: "Sure! Could you share the email address on your account so I can look this up for you?", shortcut: "/email" },
+    { title: "Refund info", content: "We offer a 30-day money-back guarantee, no questions asked. I can process that for you — just confirm your account email and I'll have it sorted within 3-5 business days.", shortcut: "/refund" },
+    { title: "Escalate to human", content: "I understand this needs a closer look. I'm connecting you with a human agent who'll pick this up shortly. Thanks for your patience! 🙏", shortcut: "/escalate" },
+    { title: "Closing thanks", content: "Glad I could help! If anything else comes up, we're always here. Have a great day! ✨", shortcut: "/bye" },
+    { title: "Pricing link", content: "You can check all our plans and pricing at replyai.app/pricing — happy to walk you through which plan fits best if you'd like!", shortcut: "/pricing" },
+  ];
+  for (const c of canned) {
+    await db.cannedResponse.create({ data: { orgId: org.id, ...c } });
+  }
+
+  console.log(`✅ Seeded: 1 org, 1 chatbot, 28 conversations, ${totalMessages} messages, contacts, ${canned.length} canned responses.`);
   console.log("   Login: demo@replyai.app / demo1234");
 }
 

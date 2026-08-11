@@ -13,15 +13,16 @@ datasource db {
 // ─── Tenancy & Auth ───────────────────────────────────────────────
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  plan      String   @default("FREE") // FREE | STARTER | PRO | SCALE
-  users     User[]
-  chatbots  Chatbot[]
-  contacts  Contact[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  plan            String   @default("FREE") // FREE | STARTER | PRO | SCALE
+  users           User[]
+  chatbots        Chatbot[]
+  contacts        Contact[]
+  cannedResponses CannedResponse[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model User {
@@ -154,4 +155,15 @@ model Contact {
   source    String   @default("WIDGET")
   notes     String?
   createdAt DateTime @default(now())
+}
+
+model CannedResponse {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  shortcut  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

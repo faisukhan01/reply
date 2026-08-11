@@ -17,6 +17,11 @@ import {
   Circle,
   ArrowLeft,
   Users,
+  Sparkles,
+  FileText,
+  Wand2,
+  Zap,
+  ChevronDown,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -205,6 +210,21 @@ export default function ConversationsPage() {
   const [aiTyping, setAiTyping] = useState(false);
   const aiTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // AI Summary
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+
+  // AI Reply Suggestions
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  // Canned responses
+  const [canned, setCanned] = useState<
+    { id: string; title: string; content: string; shortcut: string | null }[]
+  >([]);
+  const [cannedOpen, setCannedOpen] = useState(false);
+
   // Socket ref
   const socketRef = useRef<Socket | null>(null);
 
@@ -356,12 +376,18 @@ export default function ConversationsPage() {
     if (!selectedId) {
       setDetail(null);
       setMessages([]);
+      setSummary(null);
+      setSuggestions([]);
+      setShowSummary(false);
       return;
     }
     let cancelled = false;
     setLoadingDetail(true);
     setMessages([]);
     setDetail(null);
+    setSummary(null);
+    setShowSummary(false);
+    setSuggestions([]);
     (async () => {
       try {
         const res = await fetch(`/api/conversations/${selectedId}`, {
@@ -372,6 +398,9 @@ export default function ConversationsPage() {
         if (cancelled) return;
         setDetail(data.conversation);
         setMessages(data.messages ?? []);
+        if (data.conversation?.summary) {
+          setSummary(data.conversation.summary);
+        }
         // Clear unread for this conversation.
         setUnread((prev) => {
           if (!prev[selectedId]) return prev;
@@ -500,6 +529,65 @@ export default function ConversationsPage() {
       setSending(false);
     }
   }, [draft, selectedId, sending]);
+
+  // ─── AI: Generate conversation summary ──────────────────────────
+  const generateSummary = useCallback(async () => {
+    if (!selectedId || loadingSummary) return;
+    setLoadingSummary(true);
+    setShowSummary(true);
+    try {
+      const res = await fetch(`/api/conversations/${selectedId}/summary`, {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSummary(data.summary);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [selectedId, loadingSummary]);
+
+  // ─── AI: Generate reply suggestions ─────────────────────────────
+  const loadSuggestions = useCallback(async () => {
+    if (!selectedId || loadingSuggestions) return;
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`/api/conversations/${selectedId}/suggestions`, {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSuggestions(data.suggestions ?? []);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [selectedId, loadingSuggestions]);
+
+  // ─── Canned responses ───────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/canned-responses");
+        if (res.ok) {
+          const data = await res.json();
+          setCanned(data.responses ?? []);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  // Auto-load suggestions when conversation changes (if there are messages)
+  useEffect(() => {
+    if (selectedId && messages.length > 0 && suggestions.length === 0) {
+      void loadSuggestions();
+    }
+  }, [selectedId, messages.length, suggestions.length, loadSuggestions]);
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
@@ -741,6 +829,47 @@ export default function ConversationsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (summary && showSummary) {
+                                  setShowSummary(false);
+                                } else if (summary) {
+                                  setShowSummary(true);
+                                } else {
+                                  void generateSummary();
+                                }
+                              }}
+                              disabled={loadingSummary}
+                              className={cn(
+                                "gap-1.5",
+                                showSummary &&
+                                  "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                              )}
+                            >
+                              {loadingSummary ? (
+                                <Clock className="size-3.5 animate-spin" />
+                              ) : (
+                                <Sparkles className="size-3.5" />
+                              )}
+                              <span className="hidden sm:inline">
+                                {loadingSummary
+                                  ? "Summarizing…"
+                                  : summary
+                                  ? showSummary
+                                    ? "Hide summary"
+                                    : "Show summary"
+                                  : "AI Summary"}
+                              </span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Generate an AI summary of this conversation
+                          </TooltipContent>
+                        </Tooltip>
                         {detail.status !== "CLOSED" && (
                           <>
                             <Tooltip>
@@ -839,6 +968,39 @@ export default function ConversationsPage() {
                   ) : null}
                 </header>
 
+                {/* AI Summary panel */}
+                {showSummary && detail && (
+                  <div className="border-b bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3">
+                    <div className="max-w-2xl mx-auto">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
+                          <Sparkles className="size-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-violet-900 dark:text-violet-100">
+                          AI Summary
+                        </span>
+                        <button
+                          onClick={() => setShowSummary(false)}
+                          className="ml-auto text-violet-400 hover:text-violet-600 dark:hover:text-violet-200"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                      {loadingSummary ? (
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3 w-full" />
+                          <Skeleton className="h-3 w-5/6" />
+                          <Skeleton className="h-3 w-2/3" />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-violet-900/80 dark:text-violet-100/80 leading-relaxed">
+                          {summary}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto scroll-thin px-4 py-4 bg-muted/30">
                   {loadingDetail ? (
@@ -870,8 +1032,102 @@ export default function ConversationsPage() {
                 </div>
 
                 {/* Composer */}
-                <div className="border-t p-3 bg-card">
+                <div className="border-t p-3 bg-card space-y-2">
+                  {/* AI Reply Suggestions */}
+                  {detail && detail.status !== "CLOSED" && messages.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Wand2 className="size-3 text-violet-500" />
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                          AI suggested replies
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 px-1.5 text-[10px] text-violet-600 hover:text-violet-700"
+                          onClick={() => void loadSuggestions()}
+                          disabled={loadingSuggestions}
+                        >
+                          {loadingSuggestions ? (
+                            <>
+                              <Clock className="size-3 mr-1 animate-spin" /> Thinking…
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="size-3 mr-1" /> Refresh
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {loadingSuggestions && suggestions.length === 0 ? (
+                        <div className="flex gap-2">
+                          {[0, 1, 2].map((i) => (
+                            <Skeleton key={i} className="h-8 flex-1 rounded-lg" />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {suggestions.map((s, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setDraft(s)}
+                              className="group flex items-start gap-1.5 rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50/50 dark:bg-violet-950/20 px-2.5 py-1.5 text-left text-xs text-violet-900 dark:text-violet-100 hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors max-w-full"
+                            >
+                              <Sparkles className="size-3 mt-0.5 shrink-0 text-violet-500 opacity-60 group-hover:opacity-100" />
+                              <span className="line-clamp-2 flex-1">{s}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-end gap-2">
+                    {/* Canned responses dropdown */}
+                    {detail && detail.status !== "CLOSED" && canned.length > 0 && (
+                      <DropdownMenu open={cannedOpen} onOpenChange={setCannedOpen}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-10 shrink-0"
+                            aria-label="Quick replies"
+                          >
+                            <Zap className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-72">
+                          <DropdownMenuLabel className="flex items-center gap-2">
+                            <Zap className="size-3.5" /> Quick replies
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <div className="max-h-72 overflow-y-auto scroll-thin">
+                            {canned.map((c) => (
+                              <DropdownMenuItem
+                                key={c.id}
+                                onClick={() => {
+                                  setDraft(c.content);
+                                  setCannedOpen(false);
+                                }}
+                                className="flex-col items-start gap-0.5 py-2"
+                              >
+                                <div className="flex items-center gap-2 w-full">
+                                  <span className="text-xs font-medium">{c.title}</span>
+                                  {c.shortcut && (
+                                    <Badge variant="secondary" className="ml-auto text-[9px] h-4 px-1 font-mono">
+                                      {c.shortcut}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-muted-foreground line-clamp-1">
+                                  {c.content}
+                                </span>
+                              </DropdownMenuItem>
+                            ))}
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                     <Textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
