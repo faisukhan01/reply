@@ -1,0 +1,23 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/session";
+import { Sidebar } from "@/components/dashboard/sidebar";
+import { Topbar } from "@/components/dashboard/topbar";
+
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <Sidebar orgName={user.orgName} userName={user.name} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <Topbar userName={user.name} orgName={user.orgName} />
+        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+      </div>
+    </div>
+  );
+}

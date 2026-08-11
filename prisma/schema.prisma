@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ReplyAI — AI Customer Support Automation Platform
+// Multi-tenant schema: Organizations -> Users + Chatbots -> Conversations -> Messages
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +10,148 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+// ─── Tenancy & Auth ───────────────────────────────────────────────
+
+model Organization {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  name      String
+  slug      String   @unique
+  plan      String   @default("FREE") // FREE | STARTER | PRO | SCALE
+  users     User[]
+  chatbots  Chatbot[]
+  contacts  Contact[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Post {
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String
+  role         String       @default("OWNER") // OWNER | ADMIN | AGENT
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  accounts     Account[]
+  sessions     Session[]
+  assignedTo   Conversation[] @relation("AssignedAgent")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Chatbot & Knowledge ──────────────────────────────────────────
+
+model Chatbot {
+  id              String          @id @default(cuid())
+  orgId           String
+  org             Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name            String
+  welcomeMessage  String          @default("Hi! How can I help you today?")
+  persona         String          @default("friendly") // friendly | professional | concise | playful
+  systemPrompt    String?
+  primaryColor    String          @default("#6366f1")
+  status          String          @default("ACTIVE") // ACTIVE | PAUSED
+  position        String          @default("bottom-right")
+  conversations   Conversation[]
+  knowledge       KnowledgeDoc[]
+  faqs            FAQ[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model KnowledgeDoc {
+  id         String   @id @default(cuid())
+  chatbotId  String
+  chatbot    Chatbot  @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  title      String
+  content    String
+  sourceType String   @default("TEXT") // TEXT | FAQ | URL | FILE
+  createdAt  DateTime @default(now())
+}
+
+model FAQ {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  chatbotId String
+  chatbot   Chatbot  @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+}
+
+// ─── Conversations ────────────────────────────────────────────────
+
+model Conversation {
+  id           String    @id @default(cuid())
+  chatbotId    String
+  chatbot      Chatbot   @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  visitorId    String
+  visitorName  String?
+  visitorEmail String?
+  status       String    @default("AI") // AI | HUMAN | CLOSED
+  channel      String    @default("WIDGET")
+  satisfaction Int?
+  summary      String?
+  assignedToId String?
+  assignedTo   User?     @relation("AssignedAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // VISITOR | AI | AGENT
+  content        String
+  createdAt      DateTime     @default(now())
+}
+
+// ─── Contacts / Leads ─────────────────────────────────────────────
+
+model Contact {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  phone     String?
+  source    String   @default("WIDGET")
+  notes     String?
+  createdAt DateTime @default(now())
 }
