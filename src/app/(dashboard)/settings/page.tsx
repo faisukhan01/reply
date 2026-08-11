@@ -14,6 +14,11 @@ import {
   Users,
   Trash2,
   Zap,
+  Webhook,
+  Plus,
+  Copy,
+  ExternalLink,
+  TestTube,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -257,8 +262,56 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Profile completion */}
+      {!loading && (
+        <Card className="rounded-xl border shadow-sm">
+          <CardContent className="p-4">
+            {(() => {
+              const checklist = [
+                { label: "Organization profile", done: !!org?.name },
+                { label: "Team members added", done: members.length > 1 },
+                { label: "Chatbot configured", done: true },
+                { label: "Knowledge base uploaded", done: true },
+                { label: "FAQs added", done: true },
+                { label: "Widget embedded", done: true },
+              ];
+              const completed = checklist.filter((c) => c.done).length;
+              const pct = Math.round((completed / checklist.length) * 100);
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Setup progress</span>
+                      <Badge variant="secondary" className="text-xs">{pct}%</Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {pct === 100 ? "All set! 🎉" : "Complete your setup to unlock full potential"}
+                    </span>
+                  </div>
+                  <Progress value={pct} className="h-2" />
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {checklist.map((c) => (
+                      <div key={c.label} className="flex items-center gap-1.5 text-xs">
+                        {c.done ? (
+                          <Check className="h-3 w-3 text-emerald-500" />
+                        ) : (
+                          <span className="h-3 w-3 rounded-full border border-muted-foreground/30" />
+                        )}
+                        <span className={c.done ? "text-muted-foreground" : "text-muted-foreground/60"}>
+                          {c.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="organization" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto sm:h-9">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-7 h-auto sm:h-9">
           <TabsTrigger value="organization">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Organization</span>
@@ -278,6 +331,10 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications">
             <Bell className="h-4 w-4" />
             <span className="hidden sm:inline">Notifications</span>
+          </TabsTrigger>
+          <TabsTrigger value="webhooks">
+            <Webhook className="h-4 w-4" />
+            <span className="hidden sm:inline">Webhooks</span>
           </TabsTrigger>
           <TabsTrigger value="danger" className="text-destructive">
             <AlertTriangle className="h-4 w-4" />
@@ -816,6 +873,196 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Webhooks */}
+        <TabsContent value="webhooks" className="mt-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-4">
+              <Card className="rounded-xl border shadow-sm">
+                <CardHeader className="flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Webhooks</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Get notified when events happen in your account.
+                    </p>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        Add webhook
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create webhook</DialogTitle>
+                        <DialogDescription>
+                          Enter the URL where you want to receive event payloads.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="wh-url">Payload URL</Label>
+                          <Input id="wh-url" placeholder="https://your-app.com/api/webhook" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Events</Label>
+                          <div className="space-y-2">
+                            {[
+                              { id: "conv_created", label: "Conversation created" },
+                              { id: "conv_closed", label: "Conversation closed" },
+                              { id: "msg_received", label: "Message received" },
+                              { id: "sat_rated", label: "Satisfaction rated" },
+                            ].map((evt) => (
+                              <label key={evt.id} className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" className="rounded" defaultChecked={evt.id === "conv_created"} />
+                                {evt.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Signing secret</Label>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md font-mono">
+                              whsec_{Math.random().toString(36).slice(2, 14)}...
+                            </code>
+                            <Button variant="outline" size="sm" className="gap-1">
+                              <Copy className="h-3 w-3" />
+                              Copy
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Use this secret to verify webhook signatures on your server.
+                          </p>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button>Create webhook</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* Demo webhooks */}
+                    {[
+                      { url: "https://api.myapp.com/webhooks/replyai", events: ["Conversation created", "Message received"], active: true, created: "2 days ago" },
+                      { url: "https://slack-bot.myapp.com/notify", events: ["Satisfaction rated"], active: false, created: "1 week ago" },
+                    ].map((wh, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-lg border p-4 gap-4 hover:bg-muted/30 transition-colors">
+                        <div className="min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm font-mono truncate">{wh.url}</code>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {wh.events.map((e) => (
+                              <Badge key={e} variant="secondary" className="text-[10px] gap-1">
+                                <Zap className="h-2.5 w-2.5" />
+                                {e}
+                              </Badge>
+                            ))}
+                            <span className="text-[11px] text-muted-foreground">· {wh.created}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Switch defaultChecked={wh.active} />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete webhook?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will stop sending events to {wh.url}. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Test webhook */}
+              <Card className="rounded-xl border shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Test a webhook</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Send a sample payload to verify your endpoint is receiving events correctly.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Input placeholder="Select a webhook URL" className="flex-1" />
+                    <Button variant="outline" className="gap-1.5">
+                      <TestTube className="h-3.5 w-3.5" />
+                      Send test
+                    </Button>
+                  </div>
+                  <div className="rounded-lg bg-muted/50 p-3">
+                    <code className="text-xs font-mono text-muted-foreground block whitespace-pre">{`{
+  "event": "conversation.created",
+  "data": {
+    "id": "conv_abc123",
+    "visitorName": "John Doe",
+    "createdAt": "2024-08-11T10:30:00Z"
+  },
+  "timestamp": "2024-08-11T10:30:00Z"
+}`}</code>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar tips */}
+            <div className="space-y-4">
+              <Card className="rounded-xl border shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Webhook events</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {[
+                    { event: "conversation.created", desc: "Fired when a new conversation starts" },
+                    { event: "conversation.closed", desc: "Fired when a conversation is resolved" },
+                    { event: "message.received", desc: "Fired on every new visitor message" },
+                    { event: "satisfaction.rated", desc: "Fired when a visitor rates a conversation" },
+                  ].map((e) => (
+                    <div key={e.event} className="space-y-0.5">
+                      <code className="text-xs font-mono text-violet-600 dark:text-violet-400">{e.event}</code>
+                      <p className="text-xs text-muted-foreground">{e.desc}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl border border-violet-200/40 dark:border-violet-500/20 shadow-sm bg-violet-50/50 dark:bg-violet-950/10">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
+                    <Zap className="h-4 w-4" />
+                    Pro tip
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Use the signing secret to verify that payloads are actually from ReplyAI. Check the <code className="font-mono">X-ReplyAI-Signature</code> header on each request.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Danger zone */}

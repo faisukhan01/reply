@@ -1,0 +1,963 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useState } from "react";
+     4→import { toast } from "sonner";
+     5→import {
+     6→  Building2,
+     7→  Crown,
+     8→  CreditCard,
+     9→  Bell,
+    10→  AlertTriangle,
+    11→  Check,
+    12→  Loader2,
+    13→  UserPlus,
+    14→  Users,
+    15→  Trash2,
+    16→  Zap,
+    17→} from "lucide-react";
+    18→
+    19→import { Button } from "@/components/ui/button";
+    20→import { Input } from "@/components/ui/input";
+    21→import { Label } from "@/components/ui/label";
+    22→import { Badge } from "@/components/ui/badge";
+    23→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    24→import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+    25→import { Progress } from "@/components/ui/progress";
+    26→import { Separator } from "@/components/ui/separator";
+    27→import { Switch } from "@/components/ui/switch";
+    28→import { Skeleton } from "@/components/ui/skeleton";
+    29→import { Textarea } from "@/components/ui/textarea";
+    30→import {
+    31→  Tabs,
+    32→  TabsContent,
+    33→  TabsList,
+    34→  TabsTrigger,
+    35→} from "@/components/ui/tabs";
+    36→import {
+    37→  Select,
+    38→  SelectContent,
+    39→  SelectItem,
+    40→  SelectTrigger,
+    41→  SelectValue,
+    42→} from "@/components/ui/select";
+    43→import {
+    44→  Dialog,
+    45→  DialogContent,
+    46→  DialogDescription,
+    47→  DialogFooter,
+    48→  DialogHeader,
+    49→  DialogTitle,
+    50→  DialogTrigger,
+    51→} from "@/components/ui/dialog";
+    52→import {
+    53→  AlertDialog,
+    54→  AlertDialogAction,
+    55→  AlertDialogCancel,
+    56→  AlertDialogContent,
+    57→  AlertDialogDescription,
+    58→  AlertDialogFooter,
+    59→  AlertDialogHeader,
+    60→  AlertDialogTitle,
+    61→  AlertDialogTrigger,
+    62→} from "@/components/ui/alert-dialog";
+    63→import {
+    64→  Table,
+    65→  TableBody,
+    66→  TableCell,
+    67→  TableHead,
+    68→  TableHeader,
+    69→  TableRow,
+    70→} from "@/components/ui/table";
+    71→import { SavedRepliesTab } from "@/components/dashboard/saved-replies-tab";
+    72→
+    73→type Member = {
+    74→  id: string;
+    75→  name: string;
+    76→  email: string;
+    77→  role: string;
+    78→  createdAt: string;
+    79→};
+    80→
+    81→type OrgInfo = {
+    82→  id: string;
+    83→  name: string;
+    84→  slug: string;
+    85→  plan: string;
+    86→  createdAt: string;
+    87→};
+    88→
+    89→const planBadge: Record<string, { label: string; className: string }> = {
+    90→  FREE: {
+    91→    label: "Free",
+    92→    className: "bg-muted text-muted-foreground",
+    93→  },
+    94→  STARTER: {
+    95→    label: "Starter",
+    96→    className: "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
+    97→  },
+    98→  PRO: {
+    99→    label: "Pro",
+   100→    className:
+   101→      "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+   102→  },
+   103→  SCALE: {
+   104→    label: "Scale",
+   105→    className:
+   106→      "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300",
+   107→  },
+   108→};
+   109→
+   110→function formatDate(iso: string) {
+   111→  try {
+   112→    return new Date(iso).toLocaleDateString(undefined, {
+   113→      year: "numeric",
+   114→      month: "short",
+   115→      day: "numeric",
+   116→    });
+   117→  } catch {
+   118→    return iso;
+   119→  }
+   120→}
+   121→
+   122→function initials(name: string) {
+   123→  return name
+   124→    .split(" ")
+   125→    .map((p) => p[0])
+   126→    .filter(Boolean)
+   127→    .slice(0, 2)
+   128→    .join("")
+   129→    .toUpperCase();
+   130→}
+   131→
+   132→export default function SettingsPage() {
+   133→  const [org, setOrg] = useState<OrgInfo | null>(null);
+   134→  const [members, setMembers] = useState<Member[]>([]);
+   135→  const [loading, setLoading] = useState(true);
+   136→
+   137→  const [orgName, setOrgName] = useState("");
+   138→  const [savingOrg, setSavingOrg] = useState(false);
+   139→
+   140→  // invite dialog
+   141→  const [inviteOpen, setInviteOpen] = useState(false);
+   142→  const [inviting, setInviting] = useState(false);
+   143→  const [inviteForm, setInviteForm] = useState({
+   144→    name: "",
+   145→    email: "",
+   146→    password: "",
+   147→    role: "AGENT",
+   148→  });
+   149→
+   150→  // notifications
+   151→  const [notif, setNotif] = useState({
+   152→    newConversation: true,
+   153→    dailySummary: true,
+   154→    lowSatisfaction: false,
+   155→    weeklyReport: true,
+   156→  });
+   157→
+   158→  const fetchSettings = useCallback(async () => {
+   159→    setLoading(true);
+   160→    try {
+   161→      const res = await fetch("/api/settings", { cache: "no-store" });
+   162→      if (!res.ok) throw new Error("Failed to load settings");
+   163→      const data = await res.json();
+   164→      const o: OrgInfo = data.org;
+   165→      setOrg(o);
+   166→      setOrgName(o.name);
+   167→      setMembers(Array.isArray(o.users) ? (o.users as Member[]) : []);
+   168→    } catch (e) {
+   169→      toast.error("Could not load organization settings");
+   170→    } finally {
+   171→      setLoading(false);
+   172→    }
+   173→  }, []);
+   174→
+   175→  useEffect(() => {
+   176→    fetchSettings();
+   177→  }, [fetchSettings]);
+   178→
+   179→  async function handleSaveOrg(e: React.FormEvent) {
+   180→    e.preventDefault();
+   181→    if (!orgName.trim() || orgName.trim().length < 2) {
+   182→      toast.error("Name must be at least 2 characters");
+   183→      return;
+   184→    }
+   185→    setSavingOrg(true);
+   186→    try {
+   187→      const res = await fetch("/api/settings", {
+   188→        method: "PATCH",
+   189→        headers: { "Content-Type": "application/json" },
+   190→        body: JSON.stringify({ name: orgName.trim() }),
+   191→      });
+   192→      if (!res.ok) {
+   193→        const j = await res.json().catch(() => null);
+   194→        throw new Error(j?.error || "Failed to update");
+   195→      }
+   196→      const { org: updated } = await res.json();
+   197→      setOrg(updated);
+   198→      toast.success("Organization updated");
+   199→    } catch (e: unknown) {
+   200→      const msg = e instanceof Error ? e.message : "Failed to update";
+   201→      toast.error(msg);
+   202→    } finally {
+   203→      setSavingOrg(false);
+   204→    }
+   205→  }
+   206→
+   207→  async function handleInvite(e: React.FormEvent) {
+   208→    e.preventDefault();
+   209→    setInviting(true);
+   210→    try {
+   211→      const res = await fetch("/api/settings/members", {
+   212→        method: "POST",
+   213→        headers: { "Content-Type": "application/json" },
+   214→        body: JSON.stringify({
+   215→          name: inviteForm.name.trim(),
+   216→          email: inviteForm.email.trim(),
+   217→          password: inviteForm.password,
+   218→          role: inviteForm.role,
+   219→        }),
+   220→      });
+   221→      if (!res.ok) {
+   222→        const j = await res.json().catch(() => null);
+   223→        throw new Error(j?.error || "Failed to invite");
+   224→      }
+   225→      const { user } = await res.json();
+   226→      setMembers((prev) => [...prev, user as Member]);
+   227→      toast.success(`${user.name} added as ${user.role}`);
+   228→      setInviteForm({ name: "", email: "", password: "", role: "AGENT" });
+   229→      setInviteOpen(false);
+   230→    } catch (e: unknown) {
+   231→      const msg = e instanceof Error ? e.message : "Failed to invite member";
+   232→      toast.error(msg);
+   233→    } finally {
+   234→      setInviting(false);
+   235→    }
+   236→  }
+   237→
+   238→  const planLabel = org
+   239→    ? planBadge[org.plan]?.label ?? org.plan
+   240→    : "";
+   241→  const planClass = org
+   242→    ? planBadge[org.plan]?.className ?? ""
+   243→    : "";
+   244→
+   245→  return (
+   246→    <div className="space-y-6">
+   247→      {/* Header */}
+   248→      <div className="flex items-center gap-3">
+   249→        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+   250→          <Building2 className="h-6 w-6" />
+   251→        </div>
+   252→        <div>
+   253→          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+   254→          <p className="text-sm text-muted-foreground">
+   255→            Manage your organization, team, billing, and preferences.
+   256→          </p>
+   257→        </div>
+   258→      </div>
+   259→
+   260→      <Tabs defaultValue="organization" className="w-full">
+   261→        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto sm:h-9">
+   262→          <TabsTrigger value="organization">
+   263→            <Building2 className="h-4 w-4" />
+   264→            <span className="hidden sm:inline">Organization</span>
+   265→          </TabsTrigger>
+   266→          <TabsTrigger value="members">
+   267→            <Users className="h-4 w-4" />
+   268→            <span className="hidden sm:inline">Team</span>
+   269→          </TabsTrigger>
+   270→          <TabsTrigger value="replies">
+   271→            <Zap className="h-4 w-4" />
+   272→            <span className="hidden sm:inline">Replies</span>
+   273→          </TabsTrigger>
+   274→          <TabsTrigger value="billing">
+   275→            <CreditCard className="h-4 w-4" />
+   276→            <span className="hidden sm:inline">Billing</span>
+   277→          </TabsTrigger>
+   278→          <TabsTrigger value="notifications">
+   279→            <Bell className="h-4 w-4" />
+   280→            <span className="hidden sm:inline">Notifications</span>
+   281→          </TabsTrigger>
+   282→          <TabsTrigger value="danger" className="text-destructive">
+   283→            <AlertTriangle className="h-4 w-4" />
+   284→            <span className="hidden sm:inline">Danger</span>
+   285→          </TabsTrigger>
+   286→        </TabsList>
+   287→
+   288→        {/* Organization */}
+   289→        <TabsContent value="organization" className="mt-4">
+   290→          <div className="grid gap-4 lg:grid-cols-3">
+   291→            <Card className="rounded-xl border shadow-sm lg:col-span-2">
+   292→              <CardHeader>
+   293→                <CardTitle className="text-base">Organization profile</CardTitle>
+   294→              </CardHeader>
+   295→              <CardContent className="space-y-4">
+   296→                {loading ? (
+   297→                  <div className="space-y-4">
+   298→                    <Skeleton className="h-10 w-full" />
+   299→                    <Skeleton className="h-10 w-full" />
+   300→                    <Skeleton className="h-10 w-24" />
+   301→                  </div>
+   302→                ) : (
+   303→                  <form onSubmit={handleSaveOrg} className="space-y-4">
+   304→                    <div className="space-y-2">
+   305→                      <Label htmlFor="org-name">Organization name</Label>
+   306→                      <Input
+   307→                        id="org-name"
+   308→                        value={orgName}
+   309→                        onChange={(e) => setOrgName(e.target.value)}
+   310→                        placeholder="Acme Inc."
+   311→                      />
+   312→                      <p className="text-xs text-muted-foreground">
+   313→                        This name appears in your sidebar and on customer-facing
+   314→                        widget headers.
+   315→                      </p>
+   316→                    </div>
+   317→                    <div className="space-y-2">
+   318→                      <Label htmlFor="org-slug">Workspace slug</Label>
+   319→                      <div className="flex items-center gap-2">
+   320→                        <Input
+   321→                          id="org-slug"
+   322→                          value={org?.slug ?? ""}
+   323→                          readOnly
+   324→                          className="bg-muted/40 font-mono text-sm"
+   325→                        />
+   326→                        <Badge variant="outline" className="shrink-0">
+   327→                          Read-only
+   328→                        </Badge>
+   329→                      </div>
+   330→                    </div>
+   331→                    <Button type="submit" disabled={savingOrg}>
+   332→                      {savingOrg ? (
+   333→                        <>
+   334→                          <Loader2 className="h-4 w-4 animate-spin" />
+   335→                          Saving…
+   336→                        </>
+   337→                      ) : (
+   338→                        <>
+   339→                          <Check className="h-4 w-4" />
+   340→                          Save changes
+   341→                        </>
+   342→                      )}
+   343→                    </Button>
+   344→                  </form>
+   345→                )}
+   346→              </CardContent>
+   347→            </Card>
+   348→
+   349→            <Card className="rounded-xl border shadow-sm">
+   350→              <CardHeader>
+   351→                <CardTitle className="text-base flex items-center gap-2">
+   352→                  <Crown className="h-4 w-4 text-violet-500" />
+   353→                  Current plan
+   354→                </CardTitle>
+   355→              </CardHeader>
+   356→              <CardContent className="space-y-4">
+   357→                {loading ? (
+   358→                  <div className="space-y-3">
+   359→                    <Skeleton className="h-6 w-20" />
+   360→                    <Skeleton className="h-4 w-full" />
+   361→                    <Skeleton className="h-9 w-full" />
+   362→                  </div>
+   363→                ) : (
+   364→                  <>
+   365→                    <div className="flex items-center justify-between">
+   366→                      <Badge className={planClass}>{planLabel}</Badge>
+   367→                      <span className="text-xs text-muted-foreground">
+   368→                        Since {org ? formatDate(org.createdAt) : "—"}
+   369→                      </span>
+   370→                    </div>
+   371→                    <Separator />
+   372→                    <div className="space-y-1.5 text-sm">
+   373→                      <div className="flex items-center justify-between">
+   374→                        <span className="text-muted-foreground">Plan</span>
+   375→                        <span className="font-medium">{planLabel}</span>
+   376→                      </div>
+   377→                      <div className="flex items-center justify-between">
+   378→                        <span className="text-muted-foreground">Org ID</span>
+   379→                        <span className="font-mono text-xs text-muted-foreground">
+   380→                          {org?.id.slice(0, 12)}…
+   381→                        </span>
+   382→                      </div>
+   383→                    </div>
+   384→                    {org?.plan !== "SCALE" && (
+   385→                      <Button
+   386→                        className="w-full"
+   387→                        size="sm"
+   388→                        onClick={() =>
+   389→                          toast.info("Redirect to billing to upgrade")
+   390→                        }
+   391→                      >
+   392→                        <Crown className="h-4 w-4" />
+   393→                        Upgrade plan
+   394→                      </Button>
+   395→                    )}
+   396→                  </>
+   397→                )}
+   398→              </CardContent>
+   399→            </Card>
+   400→          </div>
+   401→        </TabsContent>
+   402→
+   403→        {/* Members */}
+   404→        <TabsContent value="members" className="mt-4">
+   405→          <Card className="rounded-xl border shadow-sm">
+   406→            <CardHeader className="flex flex-row items-center justify-between">
+   407→              <div>
+   408→                <CardTitle className="text-base">Team members</CardTitle>
+   409→                <p className="text-xs text-muted-foreground mt-1">
+   410→                  Invite teammates to collaborate on conversations.
+   411→                </p>
+   412→              </div>
+   413→              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+   414→                <DialogTrigger asChild>
+   415→                  <Button size="sm">
+   416→                    <UserPlus className="h-4 w-4" />
+   417→                    Invite member
+   418→                  </Button>
+   419→                </DialogTrigger>
+   420→                <DialogContent>
+   421→                  <DialogHeader>
+   422→                    <DialogTitle>Invite team member</DialogTitle>
+   423→                    <DialogDescription>
+   424→                      Create a new account for a teammate. They&apos;ll be able
+   425→                      to log in with these credentials.
+   426→                    </DialogDescription>
+   427→                  </DialogHeader>
+   428→                  <form onSubmit={handleInvite} className="space-y-4">
+   429→                    <div className="space-y-2">
+   430→                      <Label htmlFor="m-name">
+   431→                        Full name <span className="text-destructive">*</span>
+   432→                      </Label>
+   433→                      <Input
+   434→                        id="m-name"
+   435→                        placeholder="Alex Morgan"
+   436→                        value={inviteForm.name}
+   437→                        onChange={(e) =>
+   438→                          setInviteForm((p) => ({
+   439→                            ...p,
+   440→                            name: e.target.value,
+   441→                          }))
+   442→                        }
+   443→                        autoFocus
+   444→                      />
+   445→                    </div>
+   446→                    <div className="space-y-2">
+   447→                      <Label htmlFor="m-email">
+   448→                        Email <span className="text-destructive">*</span>
+   449→                      </Label>
+   450→                      <Input
+   451→                        id="m-email"
+   452→                        type="email"
+   453→                        placeholder="alex@acme.com"
+   454→                        value={inviteForm.email}
+   455→                        onChange={(e) =>
+   456→                          setInviteForm((p) => ({
+   457→                            ...p,
+   458→                            email: e.target.value,
+   459→                          }))
+   460→                        }
+   461→                      />
+   462→                    </div>
+   463→                    <div className="space-y-2">
+   464→                      <Label htmlFor="m-password">
+   465→                        Temporary password{" "}
+   466→                        <span className="text-destructive">*</span>
+   467→                      </Label>
+   468→                      <Input
+   469→                        id="m-password"
+   470→                        type="password"
+   471→                        placeholder="Min 6 characters"
+   472→                        value={inviteForm.password}
+   473→                        onChange={(e) =>
+   474→                          setInviteForm((p) => ({
+   475→                            ...p,
+   476→                            password: e.target.value,
+   477→                          }))
+   478→                        }
+   479→                      />
+   480→                    </div>
+   481→                    <div className="space-y-2">
+   482→                      <Label htmlFor="m-role">Role</Label>
+   483→                      <Select
+   484→                        value={inviteForm.role}
+   485→                        onValueChange={(v) =>
+   486→                          setInviteForm((p) => ({ ...p, role: v }))
+   487→                        }
+   488→                      >
+   489→                        <SelectTrigger id="m-role" className="w-full">
+   490→                          <SelectValue placeholder="Select a role" />
+   491→                        </SelectTrigger>
+   492→                        <SelectContent>
+   493→                          <SelectItem value="AGENT">Agent</SelectItem>
+   494→                          <SelectItem value="ADMIN">Admin</SelectItem>
+   495→                        </SelectContent>
+   496→                      </Select>
+   497→                      <p className="text-xs text-muted-foreground">
+   498→                        Agents handle conversations. Admins can also manage
+   499→                        settings & billing.
+   500→                      </p>
+   501→                    </div>
+   502→                    <DialogFooter>
+   503→                      <Button
+   504→                        type="button"
+   505→                        variant="outline"
+   506→                        onClick={() => setInviteOpen(false)}
+   507→                        disabled={inviting}
+   508→                      >
+   509→                        Cancel
+   510→                      </Button>
+   511→                      <Button type="submit" disabled={inviting}>
+   512→                        {inviting ? (
+   513→                          <>
+   514→                            <Loader2 className="h-4 w-4 animate-spin" />
+   515→                            Inviting…
+   516→                          </>
+   517→                        ) : (
+   518→                          <>
+   519→                            <UserPlus className="h-4 w-4" />
+   520→                            Invite
+   521→                          </>
+   522→                        )}
+   523→                      </Button>
+   524→                    </DialogFooter>
+   525→                  </form>
+   526→                </DialogContent>
+   527→              </Dialog>
+   528→            </CardHeader>
+   529→            <CardContent>
+   530→              {loading ? (
+   531→                <div className="space-y-3">
+   532→                  {Array.from({ length: 3 }).map((_, i) => (
+   533→                    <div key={i} className="flex items-center gap-3">
+   534→                      <Skeleton className="h-9 w-9 rounded-full" />
+   535→                      <Skeleton className="h-4 flex-1 max-w-[160px]" />
+   536→                      <Skeleton className="h-4 w-32" />
+   537→                      <Skeleton className="h-6 w-16" />
+   538→                    </div>
+   539→                  ))}
+   540→                </div>
+   541→              ) : members.length === 0 ? (
+   542→                <div className="py-10 text-center text-sm text-muted-foreground">
+   543→                  No team members yet. Invite your first teammate.
+   544→                </div>
+   545→              ) : (
+   546→                <div className="rounded-lg border overflow-hidden">
+   547→                  <Table>
+   548→                    <TableHeader>
+   549→                      <TableRow className="bg-muted/40">
+   550→                        <TableHead className="pl-4">Member</TableHead>
+   551→                        <TableHead className="hidden sm:table-cell">
+   552→                          Email
+   553→                        </TableHead>
+   554→                        <TableHead>Role</TableHead>
+   555→                        <TableHead className="hidden md:table-cell">
+   556→                          Joined
+   557→                        </TableHead>
+   558→                      </TableRow>
+   559→                    </TableHeader>
+   560→                    <TableBody>
+   561→                      {members.map((m) => (
+   562→                        <TableRow key={m.id}>
+   563→                          <TableCell className="pl-4">
+   564→                            <div className="flex items-center gap-3">
+   565→                              <Avatar className="h-9 w-9">
+   566→                                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+   567→                                  {initials(m.name) || "?"}
+   568→                                </AvatarFallback>
+   569→                              </Avatar>
+   570→                              <span className="font-medium">{m.name}</span>
+   571→                            </div>
+   572→                          </TableCell>
+   573→                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+   574→                            {m.email}
+   575→                          </TableCell>
+   576→                          <TableCell>
+   577→                            <Badge
+   578→                              variant={
+   579→                                m.role === "OWNER" ? "default" : "secondary"
+   580→                              }
+   581→                              className={
+   582→                                m.role === "ADMIN"
+   583→                                  ? "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+   584→                                  : ""
+   585→                              }
+   586→                            >
+   587→                              {m.role}
+   588→                            </Badge>
+   589→                          </TableCell>
+   590→                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+   591→                            {formatDate(m.createdAt)}
+   592→                          </TableCell>
+   593→                        </TableRow>
+   594→                      ))}
+   595→                    </TableBody>
+   596→                  </Table>
+   597→                </div>
+   598→              )}
+   599→            </CardContent>
+   600→          </Card>
+   601→        </TabsContent>
+   602→
+   603→        {/* Saved Replies */}
+   604→        <TabsContent value="replies" className="mt-4">
+   605→          <SavedRepliesTab />
+   606→        </TabsContent>
+   607→
+   608→        {/* Billing */}
+   609→        <TabsContent value="billing" className="mt-4">
+   610→          <div className="grid gap-4 lg:grid-cols-3">
+   611→            <Card className="rounded-xl border shadow-sm lg:col-span-2">
+   612→              <CardHeader>
+   613→                <CardTitle className="text-base flex items-center gap-2">
+   614→                  <CreditCard className="h-4 w-4 text-violet-500" />
+   615→                  Current plan
+   616→                </CardTitle>
+   617→              </CardHeader>
+   618→              <CardContent className="space-y-5">
+   619→                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/40 dark:to-fuchsia-950/40 border">
+   620→                  <div>
+   621→                    <div className="flex items-center gap-2">
+   622→                      <Crown className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+   623→                      <span className="font-semibold">Pro plan</span>
+   624→                      <Badge className="bg-violet-600 text-white">Active</Badge>
+   625→                    </div>
+   626→                    <p className="text-sm text-muted-foreground mt-1">
+   627→                      Up to 10,000 conversations/mo, full analytics, priority
+   628→                      email support.
+   629→                    </p>
+   630→                  </div>
+   631→                  <div className="text-right">
+   632→                    <div className="text-2xl font-bold">$79</div>
+   633→                    <div className="text-xs text-muted-foreground">/ month</div>
+   634→                  </div>
+   635→                </div>
+   636→
+   637→                <div>
+   638→                  <h4 className="text-sm font-medium mb-3">Usage this cycle</h4>
+   639→                  <div className="space-y-4">
+   640→                    <UsageBar
+   641→                      label="Conversations"
+   642→                      used={2840}
+   643→                      limit={10000}
+   644→                      display={`${(2840).toLocaleString()} / 10,000`}
+   645→                    />
+   646→                    <UsageBar
+   647→                      label="Knowledge documents"
+   648→                      used={6}
+   649→                      limit={25}
+   650→                      display="6 / 25"
+   651→                    />
+   652→                    <UsageBar
+   653→                      label="Team seats"
+   654→                      used={members.length}
+   655→                      limit={10}
+   656→                      display={`${members.length} / 10`}
+   657→                    />
+   658→                  </div>
+   659→                </div>
+   660→
+   661→                <div className="flex flex-wrap gap-2">
+   662→                  <Button
+   663→                    variant="outline"
+   664→                    size="sm"
+   665→                    onClick={() => toast.info("Opening billing portal…")}
+   666→                  >
+   667→                    <CreditCard className="h-4 w-4" />
+   668→                    Manage payment
+   669→                  </Button>
+   670→                  <Button size="sm">
+   671→                    <Crown className="h-4 w-4" />
+   672→                    Upgrade to Scale
+   673→                  </Button>
+   674→                </div>
+   675→              </CardContent>
+   676→            </Card>
+   677→
+   678→            {/* Scale plan CTA */}
+   679→            <Card className="rounded-xl border shadow-sm">
+   680→              <CardHeader>
+   681→                <CardTitle className="text-base flex items-center gap-2">
+   682→                  <Sparkles /> Scale
+   683→                </CardTitle>
+   684→              </CardHeader>
+   685→              <CardContent className="space-y-3 text-sm">
+   686→                <div className="text-3xl font-bold">
+   687→                  $199
+   688→                  <span className="text-sm font-normal text-muted-foreground">
+   689→                    /mo
+   690→                  </span>
+   691→                </div>
+   692→                <ul className="space-y-2">
+   693→                  {[
+   694→                    "Unlimited conversations",
+   695→                    "Unlimited team seats",
+   696→                    "Custom branding & domain",
+   697→                    "Priority 24/7 support",
+   698→                    "Advanced AI fine-tuning",
+   699→                  ].map((f) => (
+   700→                    <li
+   701→                      key={f}
+   702→                      className="flex items-start gap-2 text-muted-foreground"
+   703→                    >
+   704→                      <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+   705→                      <span>{f}</span>
+   706→                    </li>
+   707→                  ))}
+   708→                </ul>
+   709→                <Button className="w-full" size="sm">
+   710→                  Upgrade to Scale
+   711→                </Button>
+   712→              </CardContent>
+   713→            </Card>
+   714→          </div>
+   715→
+   716→          {/* Invoices */}
+   717→          <Card className="rounded-xl border shadow-sm mt-4">
+   718→            <CardHeader>
+   719→              <CardTitle className="text-base">Invoice history</CardTitle>
+   720→            </CardHeader>
+   721→            <CardContent>
+   722→              <div className="rounded-lg border overflow-hidden">
+   723→                <Table>
+   724→                  <TableHeader>
+   725→                    <TableRow className="bg-muted/40">
+   726→                      <TableHead className="pl-4">Invoice</TableHead>
+   727→                      <TableHead>Date</TableHead>
+   728→                      <TableHead>Amount</TableHead>
+   729→                      <TableHead className="text-right pr-4">Status</TableHead>
+   730→                    </TableRow>
+   731→                  </TableHeader>
+   732→                  <TableBody>
+   733→                    {INVOICES.map((inv) => (
+   734→                      <TableRow key={inv.id}>
+   735→                        <TableCell className="pl-4 font-mono text-xs">
+   736→                          {inv.id}
+   737→                        </TableCell>
+   738→                        <TableCell className="text-sm text-muted-foreground">
+   739→                          {inv.date}
+   740→                        </TableCell>
+   741→                        <TableCell className="text-sm">{inv.amount}</TableCell>
+   742→                        <TableCell className="text-right pr-4">
+   743→                          <Badge
+   744→                            variant="secondary"
+   745→                            className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+   746→                          >
+   747→                            <Check className="h-3 w-3" />
+   748→                            Paid
+   749→                          </Badge>
+   750→                        </TableCell>
+   751→                      </TableRow>
+   752→                    ))}
+   753→                  </TableBody>
+   754→                </Table>
+   755→              </div>
+   756→            </CardContent>
+   757→          </Card>
+   758→        </TabsContent>
+   759→
+   760→        {/* Notifications */}
+   761→        <TabsContent value="notifications" className="mt-4">
+   762→          <Card className="rounded-xl border shadow-sm max-w-2xl">
+   763→            <CardHeader>
+   764→              <CardTitle className="text-base flex items-center gap-2">
+   765→                <Bell className="h-4 w-4 text-violet-500" />
+   766→                Notification preferences
+   767→              </CardTitle>
+   768→              <p className="text-xs text-muted-foreground mt-1">
+   769→                Choose what we email you about.
+   770→              </p>
+   771→            </CardHeader>
+   772→            <CardContent className="space-y-1">
+   773→              <NotifRow
+   774→                title="New conversation email"
+   775→                description="Get an email when a new conversation starts."
+   776→                checked={notif.newConversation}
+   777→                onChecked={(v) =>
+   778→                  setNotif((p) => ({ ...p, newConversation: v }))
+   779→                }
+   780→              />
+   781→              <Separator />
+   782→              <NotifRow
+   783→                title="Daily summary"
+   784→                description="A daily digest of yesterday's activity."
+   785→                checked={notif.dailySummary}
+   786→                onChecked={(v) =>
+   787→                  setNotif((p) => ({ ...p, dailySummary: v }))
+   788→                }
+   789→              />
+   790→              <Separator />
+   791→              <NotifRow
+   792→                title="Low satisfaction alert"
+   793→                description="Alert me when a conversation gets a rating below 3."
+   794→                checked={notif.lowSatisfaction}
+   795→                onChecked={(v) =>
+   796→                  setNotif((p) => ({ ...p, lowSatisfaction: v }))
+   797→                }
+   798→              />
+   799→              <Separator />
+   800→              <NotifRow
+   801→                title="Weekly report"
+   802→                description="A weekly performance report every Monday."
+   803→                checked={notif.weeklyReport}
+   804→                onChecked={(v) =>
+   805→                  setNotif((p) => ({ ...p, weeklyReport: v }))
+   806→                }
+   807→              />
+   808→              <div className="pt-4">
+   809→                <Button
+   810→                  size="sm"
+   811→                  onClick={() => toast.success("Notification preferences saved")}
+   812→                >
+   813→                  <Check className="h-4 w-4" />
+   814→                  Save preferences
+   815→                </Button>
+   816→              </div>
+   817→            </CardContent>
+   818→          </Card>
+   819→        </TabsContent>
+   820→
+   821→        {/* Danger zone */}
+   822→        <TabsContent value="danger" className="mt-4">
+   823→          <Card className="rounded-xl border border-destructive/30 shadow-sm max-w-2xl">
+   824→            <CardHeader>
+   825→              <CardTitle className="text-base flex items-center gap-2 text-destructive">
+   826→                <AlertTriangle className="h-4 w-4" />
+   827→                Danger zone
+   828→              </CardTitle>
+   829→              <p className="text-xs text-muted-foreground mt-1">
+   830→                Irreversible actions. Proceed with caution.
+   831→              </p>
+   832→            </CardHeader>
+   833→            <CardContent className="space-y-4">
+   834→              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-destructive/30 bg-destructive/5">
+   835→                <div>
+   836→                  <div className="font-medium text-sm">Delete organization</div>
+   837→                  <p className="text-xs text-muted-foreground mt-1">
+   838→                    Permanently delete this organization, all conversations,
+   839→                    contacts, and team members. This cannot be undone.
+   840→                  </p>
+   841→                </div>
+   842→                <AlertDialog>
+   843→                  <AlertDialogTrigger asChild>
+   844→                    <Button variant="destructive" size="sm" className="shrink-0">
+   845→                      <Trash2 className="h-4 w-4" />
+   846→                      Delete account
+   847→                    </Button>
+   848→                  </AlertDialogTrigger>
+   849→                  <AlertDialogContent>
+   850→                    <AlertDialogHeader>
+   851→                      <AlertDialogTitle>
+   852→                        Are you absolutely sure?
+   853→                      </AlertDialogTitle>
+   854→                      <AlertDialogDescription>
+   855→                        This action is irreversible. Please contact our support
+   856→                        team to verify ownership before we delete your account
+   857→                        and all associated data.
+   858→                      </AlertDialogDescription>
+   859→                    </AlertDialogHeader>
+   860→                    <AlertDialogFooter>
+   861→                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+   862→                      <AlertDialogAction
+   863→                        className="bg-destructive text-white hover:bg-destructive/90"
+   864→                        onClick={() =>
+   865→                          toast.info(
+   866→                            "Contact support to delete your account — we've logged your request."
+   867→                          )
+   868→                        }
+   869→                      >
+   870→                        I understand
+   871→                      </AlertDialogAction>
+   872→                    </AlertDialogFooter>
+   873→                  </AlertDialogContent>
+   874→                </AlertDialog>
+   875→              </div>
+   876→
+   877→              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border">
+   878→                <div>
+   879→                  <div className="font-medium text-sm">Export all data</div>
+   880→                  <p className="text-xs text-muted-foreground mt-1">
+   881→                    Download a JSON archive of your organization&apos;s data.
+   882→                  </p>
+   883→                </div>
+   884→                <Button
+   885→                  variant="outline"
+   886→                  size="sm"
+   887→                  className="shrink-0"
+   888→                  onClick={() =>
+   889→                    toast.info("Export will be emailed when ready")
+   890→                  }
+   891→                >
+   892→                  Request export
+   893→                </Button>
+   894→              </div>
+   895→            </CardContent>
+   896→          </Card>
+   897→        </TabsContent>
+   898→      </Tabs>
+   899→    </div>
+   900→  );
+   901→}
+   902→
+   903→function UsageBar({
+   904→  label,
+   905→  used,
+   906→  limit,
+   907→  display,
+   908→}: {
+   909→  label: string;
+   910→  used: number;
+   911→  limit: number;
+   912→  display: string;
+   913→}) {
+   914→  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+   915→  return (
+   916→    <div className="space-y-1.5">
+   917→      <div className="flex items-center justify-between text-sm">
+   918→        <span className="text-muted-foreground">{label}</span>
+   919→        <span className="font-medium">{display}</span>
+   920→      </div>
+   921→      <Progress value={pct} />
+   922→    </div>
+   923→  );
+   924→}
+   925→
+   926→function NotifRow({
+   927→  title,
+   928→  description,
+   929→  checked,
+   930→  onChecked,
+   931→}: {
+   932→  title: string;
+   933→  description: string;
+   934→  checked: boolean;
+   935→  onChecked: (v: boolean) => void;
+   936→}) {
+   937→  return (
+   938→    <div className="flex items-center justify-between py-3 gap-4">
+   939→      <div className="min-w-0">
+   940→        <div className="text-sm font-medium">{title}</div>
+   941→        <div className="text-xs text-muted-foreground mt-0.5">
+   942→          {description}
+   943→        </div>
+   944→      </div>
+   945→      <Switch checked={checked} onCheckedChange={onChecked} />
+   946→    </div>
+   947→  );
+   948→}
+   949→
+   950→function Sparkles() {
+   951→  return (
+   952→    <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-fuchsia-500 to-violet-500 text-white">
+   953→      <Crown className="h-3.5 w-3.5" />
+   954→    </span>
+   955→  );
+   956→}
+   957→
+   958→const INVOICES = [
+   959→  { id: "INV-2024-003", date: "Jul 1, 2024", amount: "$79.00" },
+   960→  { id: "INV-2024-002", date: "Jun 1, 2024", amount: "$79.00" },
+   961→  { id: "INV-2024-001", date: "May 1, 2024", amount: "$79.00" },
+   962→];
+   963→

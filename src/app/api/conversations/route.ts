@@ -73,6 +73,7 @@ export async function GET(req: Request) {
       visitorEmail: c.visitorEmail,
       visitorId: c.visitorId,
       status: c.status,
+      channel: c.channel,
       satisfaction: c.satisfaction,
       assignedToId: c.assignedToId,
       createdAt: c.createdAt,

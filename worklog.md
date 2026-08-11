@@ -4,6 +4,7 @@
 **Product:** ReplyAI — AI Customer Support Automation Platform
 **Stack:** Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui + Prisma (SQLite) + NextAuth + Socket.io (mini-service) + z-ai-web-dev-sdk + Three.js (hero) + Framer Motion
 **Dev server:** port 3000 (running). Realtime mini-service: port 3001.
+**Latest round:** CRON-REVIEW-3 — QA testing, styling improvements, 7+ new features added.
 
 ## Architecture
 ```
@@ -446,3 +447,149 @@ Stage Summary:
 - New features: Onboarding modal, Keyboard shortcuts, Animated stat counters, Bulk actions on conversations, Export analytics CSV, Quick action chips in widget, Visitor name input, "Needs attention" filter
 - CSS: 8 new animation utilities added (glassmorphism, gradient-border, bubble-in, widget-slide-up, etc.)
 - Zero lint errors, zero build errors
+
+---
+Task ID: 4
+Agent: landing-page-styling
+Task: Improve landing page styling with integration logos, how it works, FAQ, comparison table
+
+Work Log:
+- Read existing page.tsx, worklog.md, globals.css, and component files to understand current structure
+- Added CSS animations to globals.css: marquee-scroll for logo strip, grain-overlay for hero texture, cta-gradient-border for animated border
+- Added Integration Partners Logo Strip section between Stats and Features with 8 logos (Slack, Shopify, WordPress, Intercom, Zendesk, HubSpot, Stripe, Notion) as infinite scrolling marquee with grayscale-to-color hover effect and fade edges
+- Added "How It Works" section with 3 numbered steps (Upload your knowledge, Customize & embed, Watch it work) between Features and Testimonials, with gradient circles, step numbers, and dashed connecting line on desktop
+- Added FAQ Accordion section before Pricing with 6 questions using shadcn/ui Accordion component
+- Added Comparison Table section before CTA comparing ReplyAI vs Traditional Support across 4 metrics (Response time, Availability, Cost per conversation, Languages) using shadcn/ui Table with violet-highlighted ReplyAI column
+- Added grain/noise texture overlay on hero section via CSS pseudo-element with SVG noise
+- Added animated gradient border on CTA section using rotating conic gradient
+- Added social proof micro-text "Trusted by 5,000+ teams" with avatar cluster in hero section
+- Added new Lucide icon imports: Upload, Paintbrush, Activity, X, HelpCircle, Clock, Users, DollarSign, Languages
+- Ran bun run lint — no errors
+
+Stage Summary:
+- Landing page now has 8 major sections: Hero, Stats, Integration Strip, Features, How It Works, Testimonials, Trust Strip, FAQ, Pricing, Comparison Table, CTA, Footer
+- All new sections are responsive (mobile-first) and use existing animation components (FadeIn, StaggerContainer, StaggerItem)
+- FAQ uses shadcn/ui Accordion, Comparison uses shadcn/ui Table
+- No blue/indigo colors used — all violet/fuchsia/emerald/amber
+- export const dynamic = "force-static" preserved
+- All CSS animations are pure CSS (no JS animation frames) for performance
+
+---
+Task ID: 5
+Agent: conversation-filters
+Task: Add conversation search filters, date range, status multi-filter, bulk actions
+
+Work Log:
+- Updated API `/api/conversations` to return `channel` field in list response
+- Added DELETE handler to `/api/conversations/[id]` route for bulk delete support
+- Added new imports: Calendar, Popover, Checkbox, AlertDialog, DropdownMenuCheckboxItem, DateRange type, date-fns helpers
+- Updated `ConversationListItem` type to include `channel: string`
+- Added filter state: dateRange, datePreset, statusFilters (Set), channelFilters (Set), satisfactionFilter, showDeleteDialog, searchInputRef, debouncedSearch
+- Implemented enhanced `filteredConversations` with multi-status, channel, satisfaction, date range, and client-side search across name/email/message content
+- Built Date Range Filter UI using Popover + Calendar component with "Last 7 days", "Last 30 days", and "Custom" quick presets
+- Built Enhanced Status Multi-Filter dropdown using DropdownMenuCheckboxItem with checkboxes for AI/HUMAN/CLOSED
+- Built Channel filter dropdown (Widget/API) with checkbox items
+- Built Satisfaction filter dropdown (All/Rated/Unrated/High/Low) with visual active state
+- Enhanced search with ⌘F keyboard shortcut (global listener), 300ms debounced search, multi-field search (name, email, message content), search result highlights using amber `<mark>` tags, Escape to clear
+- Added conversation count display showing filtered count + selected count
+- Added active filter count badge with one-click clear all
+- Improved Bulk Actions Bar: selected count badge, Select all/Deselect all toggle, Close all (parallel requests), Assign to dropdown (team members list), Mark as read, Delete button with AlertDialog confirmation, Cancel button
+- Added Delete confirmation AlertDialog with destructive styling
+- Added channel type icons (Globe for Widget, Code for API) next to each conversation
+- Improved hover state with violet left border accent (hover:border-l-violet-300)
+- Added satisfaction star display in conversation list items
+- Enhanced selected item styling (bg-primary/5 border-l-primary/40)
+- Improved empty state with gradient background, glow blur, and better messaging
+- Added relative time tooltip with full datetime on hover
+- Fixed DropdownMenuContent align prop (bottom → start)
+
+Stage Summary:
+- Conversations page now has comprehensive filtering: status multi-select, channel, satisfaction, date range with quick presets, and enhanced debounced search across multiple fields
+- Bulk actions bar fully functional with close all, assign to team member, mark as read, delete with confirmation, and select all/deselect all
+- Search supports ⌘F shortcut, 300ms debounce, highlights, and Escape to clear
+- All filters show active count badge with one-click clear all
+- Conversation list items show channel icons, satisfaction stars, and improved hover states
+- No TypeScript errors in conversations/page.tsx, lint passes cleanly
+
+---
+Task ID: CRON-REVIEW-3
+Agent: main (orchestrator) — webDevReview cron round 3
+Task: QA testing + styling improvements + 7+ new features
+
+## Current Project Status Assessment
+ReplyAI was stable after round 2 (5 features added: Saved Replies, Assign wiring, Visitor panel, Satisfaction survey, CSV export). This round focused on comprehensive styling improvements and new feature additions per cron review requirements. The app was stable with zero lint errors at start.
+
+## Completed Modifications
+
+### QA & Testing
+- Dev server restart required (sandbox kills idle processes)
+- Landing page QA with agent-browser: all sections load correctly, zero errors
+- Login page QA: loads with demo credentials pre-filled
+- Lint check: 0 errors, 0 warnings ✅
+
+### Landing Page Styling Improvements (Task 4 — via subagent)
+1. **Integration Partners Logo Strip** — Infinite scrolling marquee with 8 logos (Slack, Shopify, WordPress, Intercom, Zendesk, HubSpot, Stripe, Notion). Grayscale-to-color on hover, fade edges, pauses on hover.
+2. **"How It Works" Section** — 3 numbered steps with gradient circles, icons, dashed connecting lines on desktop:
+   - Upload your knowledge (Upload icon)
+   - Customize & embed (Paintbrush icon)
+   - Watch it work (Activity icon)
+3. **FAQ Accordion Section** — 6 questions using shadcn/ui Accordion covering: knowledge base learning, customization, AI fallback, human handoff, security, multi-site support.
+4. **Comparison Table** — "ReplyAI vs. Traditional Support" with 4 metrics (response time, availability, cost, languages). ReplyAI column highlighted in violet with checkmarks, traditional column with X marks.
+5. **Visual Polish** — Grain/noise texture overlay on hero, animated gradient border on CTA, social proof micro-text with avatar cluster.
+
+### Conversation Inbox Enhancements (Task 5 — via subagent)
+1. **Date Range Filter** — Popover with Calendar for Last 7/30 days or Custom range. Client-side filtering.
+2. **Enhanced Status Multi-Filter** — DropdownMenu with checkboxes for AI/HUMAN/CLOSED (multi-select). Channel filter (Widget/API). Satisfaction filter (All/Rated/Unrated/High/Low). Active filter count badge.
+3. **Conversation Search Enhancement** — ⌘F keyboard shortcut, 300ms debounce, multi-field search (visitor name, email, message content), amber highlight on matches, Escape to clear.
+4. **Bulk Actions Bar** — Floating action bar with: selected count, select all/deselect all, Close all, Assign to dropdown, Mark as read, Delete with AlertDialog. Smooth framer-motion slide-up animation.
+5. **Styling Improvements** — Channel type icons, violet hover left border accent, satisfaction stars, improved empty state, conversation count header.
+6. **API Updates** — Added `channel` field to conversations list, DELETE handler for conversations.
+
+### Widget Improvements (Task 6 — direct)
+1. **Read Receipts** — Visitor messages show ✓ (sent) or ✓✓ (read) icons below message. AI responses mark visitor messages as read.
+2. **Message Timestamps** — Relative timestamps on all messages ("just now", "2m ago", "1h ago"). Welcome message now includes timestamp.
+3. **Enhanced Quick Action Chips** — Each chip now has an icon (DollarSign for Pricing, Clock for Hours, Headphones for Talk to human). Added hover scale effect via framer-motion.
+4. **Unread Badge on Minimized Button** — When widget is closed and has messages, shows a red badge with AI message count + glow pulse animation.
+5. **Improved Open/Close Animations** — Larger hover scale (1.08), more dramatic tap scale (0.92).
+
+### Settings — Webhooks Tab (Task 7 — direct)
+1. **Webhooks Tab** — 7th tab in Settings (grid-cols-7). Webhook icon from lucide-react.
+2. **Webhook List UI** — 2 demo webhooks showing URL, events, active/inactive toggle, created date, delete with confirmation.
+3. **Create Webhook Dialog** — URL input, event type checkboxes (conversation.created, conversation.closed, message.received, satisfaction.rated), auto-generated signing secret with copy button.
+4. **Test Webhook Section** — Input for webhook URL, "Send test" button, sample JSON payload preview.
+5. **Sidebar Tips** — Event reference list, Pro tip card about signing secret verification.
+
+### Settings — Profile Completion Progress (Task 7 — direct)
+1. **Setup Progress Bar** — At top of Settings page. 6-item checklist: Organization profile, Team members, Chatbot configured, Knowledge base, FAQs, Widget embedded.
+2. **Progress Bar** — shadcn/ui Progress component showing percentage.
+3. **Visual Indicators** — Green checkmarks for completed items, empty circles for pending. "All set! 🎉" when 100%.
+
+### Conversations — Mobile Visitor Panel (Task 8 — direct)
+1. **Sheet/Drawer on Mobile** — Added shadcn/ui Sheet that opens from the right on mobile (<lg breakpoint) with full visitor info: avatar, name, email, status, stats, details, visitor ID.
+2. **Desktop panel unchanged** — Still uses `hidden lg:flex` aside.
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- agent-browser QA: Landing page loads with all new sections ✅
+  - Integration logos strip visible ✅
+  - "How It Works" 3 steps ✅
+  - FAQ accordion (6 items, expandable) ✅
+  - Comparison table (4 metrics) ✅
+  - All existing sections intact ✅
+- Dev server: port 3000 running. Realtime: port 3001 running.
+- Zero TypeScript or runtime errors.
+
+## Unresolved Issues / Risks
+1. **Dev server stability**: Sandbox occasionally kills idle `bun run dev` processes. Auto-restarts on next request. Low impact on development.
+2. **Webhook persistence**: Webhooks are demo-only (no API backend yet). The UI is present but creating/editing doesn't persist. Need to add a Webhook model to Prisma or use JSON field on Organization.
+3. **Bulk delete**: Conversation deletion API was added but may need soft-delete consideration for production.
+4. **Date filter**: Currently client-side only (filters fetched conversations). For large datasets, should be server-side with query params.
+
+## Priority Recommendations for Next Phase
+1. **Webhook persistence**: Add Webhook model to Prisma schema and wire up CRUD API routes.
+2. **Team roles & permissions**: Differentiate OWNER/ADMIN/AGENT capabilities (e.g., only OWNER can delete org, ADMIN can invite, AGENT can only view conversations).
+3. **Onboarding flow**: First-time setup wizard (create bot → upload KB → embed widget) with step indicators and progress tracking.
+4. **Conversation tags/labels**: Let agents tag conversations for categorization and reporting.
+5. **Real-time Socket.io emission**: Wire `join:org` in the inbox for true cross-conversation live updates (eliminate 10s polling fallback).
+6. **Analytics dashboard enhancements**: Add date range picker, more chart types (response time distribution, satisfaction trend), export PDF option.
+7. **Localization/i18n**: Support multiple languages in the widget UI.

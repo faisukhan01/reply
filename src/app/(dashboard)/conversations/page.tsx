@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow, format, subDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
+import { type DateRange } from "react-day-picker";
 import {
   Search,
   Send,
@@ -30,6 +31,14 @@ import {
   UserCheck,
   SquareCheck,
   Square,
+  Calendar,
+  Filter,
+  Trash2,
+  Eye,
+  CheckSquare,
+  Globe,
+  Code,
+  Command,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -40,6 +49,23 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -49,11 +75,18 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 // ─── Types ────────────────────────────────────────────────────────
 type ConvStatus = "AI" | "HUMAN" | "CLOSED";
@@ -70,6 +103,7 @@ type ConversationListItem = {
   visitorEmail: string | null;
   visitorId: string;
   status: ConvStatus;
+  channel: string;
   satisfaction: number | null;
   assignedToId: string | null;
   createdAt: string;
@@ -259,6 +293,45 @@ export default function ConversationsPage() {
   }, []);
   const clearSelection = useCallback(() => setSelectedConvos(new Set()), []);
 
+  // ─── Enhanced Filters ────────────────────────────────────────────
+  // Date range filter
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [datePreset, setDatePreset] = useState<"all" | "7d" | "30d" | "custom">("all");
+
+  // Multi-status filter (replaces single tab for status, but tab still controls needs_attention)
+  const [statusFilters, setStatusFilters] = useState<Set<ConvStatus>>(new Set());
+
+  // Channel filter
+  const [channelFilters, setChannelFilters] = useState<Set<string>>(new Set());
+
+  // Satisfaction filter
+  const [satisfactionFilter, setSatisfactionFilter] = useState<"all" | "rated" | "unrated" | "high" | "low">("all");
+
+  // Bulk delete dialog
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Search ref for ⌘F shortcut
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Debounced search (300ms)
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (datePreset !== "all") count++;
+    if (statusFilters.size > 0) count++;
+    if (channelFilters.size > 0) count++;
+    if (satisfactionFilter !== "all") count++;
+    if (search.trim()) count++;
+    if (tab !== "ALL") count++;
+    return count;
+  }, [datePreset, statusFilters, channelFilters, satisfactionFilter, search, tab]);
+
   // Socket ref
   const socketRef = useRef<Socket | null>(null);
 
@@ -270,8 +343,7 @@ export default function ConversationsPage() {
   const fetchList = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (tab !== "ALL") params.set("status", tab);
-      if (search.trim()) params.set("q", search.trim());
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
       const res = await fetch(`/api/conversations?${params.toString()}`, {
         cache: "no-store",
       });
@@ -283,16 +355,16 @@ export default function ConversationsPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [tab, search]);
+  }, [debouncedSearch]);
 
-  // Debounce search
+  // Debounce search + refetch
   useEffect(() => {
     setLoadingList(true);
     const t = setTimeout(() => {
       void fetchList();
-    }, 250);
+    }, 300);
     return () => clearTimeout(t);
-  }, [search, tab, fetchList]);
+  }, [debouncedSearch, fetchList]);
 
   // Initial load + polling fallback (every 10s)
   useEffect(() => {
@@ -472,13 +544,74 @@ export default function ConversationsPage() {
     return c;
   }, [conversations]);
 
-  // Filtered conversations for display
+  // Filtered conversations for display — enhanced with all filters
   const filteredConversations = useMemo(() => {
+    let filtered = conversations;
+
+    // Tab filter (needs attention)
     if (tab === "NEEDS_ATTENTION") {
-      return conversations.filter((c) => c.status === "HUMAN" && !c.assignedToId);
+      filtered = filtered.filter((c) => c.status === "HUMAN" && !c.assignedToId);
     }
-    return conversations;
-  }, [conversations, tab]);
+
+    // Multi-status filter
+    if (statusFilters.size > 0 && tab !== "NEEDS_ATTENTION") {
+      filtered = filtered.filter((c) => statusFilters.has(c.status));
+    }
+
+    // Channel filter
+    if (channelFilters.size > 0) {
+      filtered = filtered.filter((c) => channelFilters.has(c.channel));
+    }
+
+    // Satisfaction filter
+    if (satisfactionFilter !== "all") {
+      filtered = filtered.filter((c) => {
+        switch (satisfactionFilter) {
+          case "rated": return c.satisfaction !== null;
+          case "unrated": return c.satisfaction === null;
+          case "high": return c.satisfaction !== null && c.satisfaction >= 4;
+          case "low": return c.satisfaction !== null && c.satisfaction <= 2;
+          default: return true;
+        }
+      });
+    }
+
+    // Date range filter
+    if (datePreset !== "all" && dateRange?.from) {
+      const from = startOfDay(dateRange.from);
+      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      filtered = filtered.filter((c) => {
+        try {
+          return isWithinInterval(new Date(c.updatedAt), { start: from, end: to });
+        } catch {
+          return false;
+        }
+      });
+    } else if (datePreset === "7d") {
+      const from = subDays(new Date(), 7);
+      filtered = filtered.filter((c) => {
+        try { return new Date(c.updatedAt) >= from; } catch { return false; }
+      });
+    } else if (datePreset === "30d") {
+      const from = subDays(new Date(), 30);
+      filtered = filtered.filter((c) => {
+        try { return new Date(c.updatedAt) >= from; } catch { return false; }
+      });
+    }
+
+    // Client-side search across visitor name, email, and message content
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
+      filtered = filtered.filter((c) => {
+        const name = (c.visitorName || "").toLowerCase();
+        const email = (c.visitorEmail || "").toLowerCase();
+        const msg = (c.lastMessage?.content || "").toLowerCase();
+        return name.includes(q) || email.includes(q) || msg.includes(q);
+      });
+    }
+
+    return filtered;
+  }, [conversations, tab, statusFilters, channelFilters, satisfactionFilter, datePreset, dateRange, debouncedSearch]);
 
   // ─── Actions ───────────────────────────────────────────────────
   const patchConversation = useCallback(
@@ -655,6 +788,18 @@ export default function ConversationsPage() {
 
   const handleBack = () => setMobileView("list");
 
+  // ─── ⌘F keyboard shortcut ──────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   // ─── Render ────────────────────────────────────────────────────
   return (
     <TooltipProvider delayDuration={200}>
@@ -704,54 +849,294 @@ export default function ConversationsPage() {
               mobileView === "detail" ? "hidden md:flex" : "flex"
             )}
           >
-            {/* Search */}
+            {/* Search + ⌘F shortcut */}
             <div className="p-3 border-b">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
+                  ref={searchInputRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search visitors…"
-                  className="pl-8 bg-background"
+                  onKeyDown={(e) => { if (e.key === "Escape") { setSearch(""); searchInputRef.current?.blur(); } }}
+                  placeholder="Search name, email, messages…"
+                  className="pl-8 pr-16 bg-background"
                 />
+                <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none inline-flex items-center gap-0.5 rounded border border-muted-foreground/20 bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
+                  <Command className="size-2.5" />F
+                </kbd>
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex items-center gap-1 px-2 py-2 border-b overflow-x-auto scroll-thin">
-              {(
-                [
-                  { key: "ALL", label: "All", count: counts.ALL },
-                  { key: "AI", label: "AI", count: counts.AI },
-                  { key: "HUMAN", label: "Human", count: counts.HUMAN },
-                  { key: "NEEDS_ATTENTION", label: "Needs attention", count: counts.NEEDS_ATTENTION },
-                  { key: "CLOSED", label: "Closed", count: counts.CLOSED },
-                ] as { key: Tab; label: string; count: number }[]
-              ).map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
-                    tab === t.key
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  {t.key === "NEEDS_ATTENTION" && <AlertTriangle className="size-3" />}
-                  {t.label}
-                  <span
+            {/* ⌘F global shortcut */}
+            {/* (handled via effect below) */}
+
+            {/* Filter bar: Tabs + Filter dropdowns */}
+            <div className="px-2 py-2 border-b space-y-2">
+              {/* Tab row */}
+              <div className="flex items-center gap-1 overflow-x-auto scroll-thin">
+                {(
+                  [
+                    { key: "ALL", label: "All", count: counts.ALL },
+                    { key: "AI", label: "AI", count: counts.AI },
+                    { key: "HUMAN", label: "Human", count: counts.HUMAN },
+                    { key: "NEEDS_ATTENTION", label: "Needs attention", count: counts.NEEDS_ATTENTION },
+                    { key: "CLOSED", label: "Closed", count: counts.CLOSED },
+                  ] as { key: Tab; label: string; count: number }[]
+                ).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => {
+                      setTab(t.key);
+                      // When selecting a tab, also set status filter to match (for ALL, clear)
+                      if (t.key === "ALL" || t.key === "NEEDS_ATTENTION") {
+                        setStatusFilters(new Set());
+                      } else {
+                        setStatusFilters(new Set([t.key as ConvStatus]));
+                      }
+                    }}
                     className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] leading-none",
-                      tab === t.key
-                        ? "bg-primary-foreground/20"
-                        : "bg-muted text-muted-foreground"
+                      "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
+                      (tab === t.key || (t.key !== "ALL" && t.key !== "NEEDS_ATTENTION" && statusFilters.has(t.key as ConvStatus) && tab !== "NEEDS_ATTENTION"))
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                   >
-                    {t.count}
+                    {t.key === "NEEDS_ATTENTION" && <AlertTriangle className="size-3" />}
+                    {t.label}
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[10px] leading-none",
+                        (tab === t.key || (t.key !== "ALL" && t.key !== "NEEDS_ATTENTION" && statusFilters.has(t.key as ConvStatus)))
+                          ? "bg-primary-foreground/20"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {t.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Filter dropdowns row */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Status multi-filter */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                      <Filter className="size-3" />
+                      Status
+                      {statusFilters.size > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1 text-[10px]">{statusFilters.size}</Badge>
+                      )}
+                      <ChevronDown className="size-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-40">
+                    <DropdownMenuLabel className="text-xs">Status</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {(["AI", "HUMAN", "CLOSED"] as ConvStatus[]).map((s) => (
+                      <DropdownMenuCheckboxItem
+                        key={s}
+                        checked={statusFilters.has(s)}
+                        onCheckedChange={(checked) => {
+                          setStatusFilters((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.add(s);
+                            else next.delete(s);
+                            return next;
+                          });
+                        }}
+                        onSelect={(e) => e.preventDefault()}
+                        className="text-xs"
+                      >
+                        {statusLabel(s)}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Channel filter */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                      <Globe className="size-3" />
+                      Channel
+                      {channelFilters.size > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1 text-[10px]">{channelFilters.size}</Badge>
+                      )}
+                      <ChevronDown className="size-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-40">
+                    <DropdownMenuLabel className="text-xs">Channel</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {(["WIDGET", "API"] as string[]).map((ch) => (
+                      <DropdownMenuCheckboxItem
+                        key={ch}
+                        checked={channelFilters.has(ch)}
+                        onCheckedChange={(checked) => {
+                          setChannelFilters((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.add(ch);
+                            else next.delete(ch);
+                            return next;
+                          });
+                        }}
+                        onSelect={(e) => e.preventDefault()}
+                        className="text-xs"
+                      >
+                        {ch === "WIDGET" ? <Globe className="size-3 mr-2" /> : <Code className="size-3 mr-2" />}
+                        {ch}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Satisfaction filter */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn("gap-1.5 h-7 text-xs", satisfactionFilter !== "all" && "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300")}
+                    >
+                      <Star className="size-3" />
+                      Satisfaction
+                      {satisfactionFilter !== "all" && (
+                        <Badge variant="secondary" className="h-4 px-1 text-[10px]">1</Badge>
+                      )}
+                      <ChevronDown className="size-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-40">
+                    <DropdownMenuLabel className="text-xs">Satisfaction</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {([
+                      { key: "all", label: "All" },
+                      { key: "rated", label: "Rated" },
+                      { key: "unrated", label: "Unrated" },
+                      { key: "high", label: "High (4-5)" },
+                      { key: "low", label: "Low (1-2)" },
+                    ] as { key: typeof satisfactionFilter; label: string }[]).map((opt) => (
+                      <DropdownMenuItem
+                        key={opt.key}
+                        onClick={() => setSatisfactionFilter(opt.key)}
+                        className={cn("text-xs", satisfactionFilter === opt.key && "bg-accent")}
+                      >
+                        {satisfactionFilter === opt.key && <Check className="size-3 mr-2" />}
+                        {opt.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Date range filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn("gap-1.5 h-7 text-xs", datePreset !== "all" && "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300")}
+                    >
+                      <Calendar className="size-3" />
+                      {datePreset === "all" ? "Date" : datePreset === "7d" ? "7 days" : datePreset === "30d" ? "30 days" : "Custom"}
+                      <ChevronDown className="size-3 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0">
+                    <div className="p-3 space-y-3">
+                      <div className="flex items-center gap-1.5">
+                        {(["7d", "30d"] as const).map((p) => (
+                          <Button
+                            key={p}
+                            variant={datePreset === p ? "default" : "outline"}
+                            size="sm"
+                            className="h-6 text-xs px-2"
+                            onClick={() => {
+                              setDatePreset(p);
+                              setDateRange(undefined);
+                            }}
+                          >
+                            {p === "7d" ? "Last 7 days" : "Last 30 days"}
+                          </Button>
+                        ))}
+                        <Button
+                          variant={datePreset === "custom" ? "default" : "outline"}
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => setDatePreset("custom")}
+                        >
+                          Custom
+                        </Button>
+                      </div>
+                      {datePreset === "custom" && (
+                        <CalendarPicker
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={(range) => {
+                            setDateRange(range);
+                            if (range?.from) setDatePreset("custom");
+                          }}
+                          numberOfMonths={1}
+                          className="rounded-md border"
+                        />
+                      )}
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => {
+                            setDatePreset("all");
+                            setDateRange(undefined);
+                          }}
+                        >
+                          Clear
+                        </Button>
+                        {datePreset === "custom" && dateRange?.from && (
+                          <span className="text-xs text-muted-foreground">
+                            {format(dateRange.from, "MMM d, yyyy")}
+                            {dateRange.to && ` – ${format(dateRange.to, "MMM d, yyyy")}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Active filter count */}
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="h-5 text-[10px] gap-1">
+                    {activeFilterCount} active
+                    <button
+                      className="ml-0.5 hover:text-destructive"
+                      onClick={() => {
+                        setSearch("");
+                        setTab("ALL");
+                        setStatusFilters(new Set());
+                        setChannelFilters(new Set());
+                        setSatisfactionFilter("all");
+                        setDatePreset("all");
+                        setDateRange(undefined);
+                      }}
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Conversation count */}
+            <div className="px-3 py-1.5 border-b bg-muted/30">
+              <span className="text-[10px] text-muted-foreground">
+                {filteredConversations.length} conversation{filteredConversations.length !== 1 ? "s" : ""}
+                {selectedConvos.size > 0 && (
+                  <span className="ml-2 text-primary font-medium">
+                    · {selectedConvos.size} selected
                   </span>
-                </button>
-              ))}
+                )}
+              </span>
             </div>
 
             {/* List */}
@@ -759,7 +1144,18 @@ export default function ConversationsPage() {
               {loadingList && filteredConversations.length === 0 ? (
                 <ListSkeleton />
               ) : filteredConversations.length === 0 ? (
-                <EmptyList onClearFilters={() => { setSearch(""); setTab("ALL"); }} hasFilters={search.trim() !== "" || tab !== "ALL"} />
+                <EmptyList
+                  onClearFilters={() => {
+                    setSearch("");
+                    setTab("ALL");
+                    setStatusFilters(new Set());
+                    setChannelFilters(new Set());
+                    setSatisfactionFilter("all");
+                    setDatePreset("all");
+                    setDateRange(undefined);
+                  }}
+                  hasFilters={activeFilterCount > 0}
+                />
               ) : (
                 <ul className="divide-y">
                   {filteredConversations.map((conv) => {
@@ -767,6 +1163,22 @@ export default function ConversationsPage() {
                     const isUnread = (unread[conv.id] ?? 0) > 0;
                     const isSelected = conv.id === selectedId;
                     const isChecked = selectedConvos.has(conv.id);
+                    // Search highlight helper
+                    const highlightText = (text: string) => {
+                      if (!debouncedSearch.trim()) return text;
+                      const q = debouncedSearch.trim();
+                      const idx = text.toLowerCase().indexOf(q.toLowerCase());
+                      if (idx === -1) return text;
+                      return (
+                        <>
+                          {text.slice(0, idx)}
+                          <mark className="bg-amber-200/60 dark:bg-amber-500/30 rounded-sm px-0.5">
+                            {text.slice(idx, idx + q.length)}
+                          </mark>
+                          {text.slice(idx + q.length)}
+                        </>
+                      );
+                    };
                     return (
                       <li key={conv.id}>
                         <button
@@ -774,8 +1186,10 @@ export default function ConversationsPage() {
                           className={cn(
                             "w-full flex items-start gap-3 px-3 py-3 text-left transition-all group relative",
                             isSelected
-                              ? "bg-accent/60 border-l-2 border-l-primary"
-                              : "hover:bg-muted/60 border-l-2 border-l-transparent"
+                              ? "bg-accent/60 border-l-2 border-l-violet-500"
+                              : isChecked
+                                ? "bg-primary/5 border-l-2 border-l-primary/40"
+                                : "hover:bg-muted/50 border-l-2 border-l-transparent hover:border-l-violet-300"
                           )}
                         >
                           {/* Checkbox */}
@@ -802,9 +1216,9 @@ export default function ConversationsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <span className="truncate text-sm font-medium">
-                                {name}
+                                {highlightText(name)}
                               </span>
-                              <span className="text-[10px] text-muted-foreground shrink-0">
+                              <span className="text-[10px] text-muted-foreground shrink-0" title={conv.lastMessage ? new Date(conv.lastMessage.createdAt).toLocaleString() : new Date(conv.updatedAt).toLocaleString()}>
                                 {conv.lastMessage
                                   ? timeAgo(conv.lastMessage.createdAt)
                                   : timeAgo(conv.updatedAt)}
@@ -813,7 +1227,7 @@ export default function ConversationsPage() {
                             <div className="flex items-center gap-2 mt-0.5">
                               <p className="flex-1 truncate text-xs text-muted-foreground">
                                 {conv.lastMessage
-                                  ? conv.lastMessage.content
+                                  ? highlightText(conv.lastMessage.content)
                                   : "No messages yet"}
                               </p>
                               {isUnread && (
@@ -821,6 +1235,12 @@ export default function ConversationsPage() {
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-1.5">
+                              {/* Channel icon */}
+                              {conv.channel === "WIDGET" ? (
+                                <Globe className="size-3 text-muted-foreground/60" />
+                              ) : (
+                                <Code className="size-3 text-muted-foreground/60" />
+                              )}
                               <Badge
                                 variant="outline"
                                 className={cn(
@@ -833,6 +1253,13 @@ export default function ConversationsPage() {
                               {conv.messageCount > 0 && (
                                 <span className="text-[10px] text-muted-foreground">
                                   {conv.messageCount} msg
+                                </span>
+                              )}
+                              {/* Satisfaction star */}
+                              {conv.satisfaction !== null && conv.satisfaction > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500">
+                                  <Star className="size-2.5 fill-amber-500" />
+                                  {conv.satisfaction}
                                 </span>
                               )}
                               {/* Glow dot for HUMAN conversations needing attention */}
@@ -1437,6 +1864,123 @@ export default function ConversationsPage() {
                     </div>
                   </aside>
                 )}
+
+                {/* Mobile visitor panel (Sheet/Drawer) */}
+                <Sheet open={showVisitorPanel && !!detail} onOpenChange={setShowVisitorPanel}>
+                  <SheetContent side="right" className="w-80 p-0 lg:hidden">
+                    <SheetHeader className="px-4 py-3 border-b">
+                      <SheetTitle className="text-sm">Visitor info</SheetTitle>
+                    </SheetHeader>
+                    {detail && (
+                      <div className="p-4 space-y-5 overflow-y-auto scroll-thin">
+                        {/* Avatar + identity */}
+                        <div className="flex flex-col items-center text-center pb-4 border-b">
+                          <Avatar className="size-16 mb-2">
+                            <AvatarFallback
+                              className={cn(
+                                "text-white text-lg font-semibold",
+                                avatarColor(
+                                  detail.visitorName ||
+                                    detail.visitorEmail ||
+                                    "Visitor"
+                                )
+                              )}
+                            >
+                              {initials(detail.visitorName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="text-sm font-medium">
+                            {detail.visitorName || "Anonymous Visitor"}
+                          </div>
+                          {detail.visitorEmail && (
+                            <div className="text-xs text-muted-foreground truncate w-full mt-0.5">
+                              {detail.visitorEmail}
+                            </div>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 h-4 mt-2",
+                              statusBadgeClass(detail.status)
+                            )}
+                          >
+                            {statusLabel(detail.status)}
+                          </Badge>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-lg border p-2.5 text-center">
+                            <div className="text-lg font-bold text-violet-600 dark:text-violet-400">
+                              {detail.visitor?.totalConversations ?? 1}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Conversations
+                            </div>
+                          </div>
+                          <div className="rounded-lg border p-2.5 text-center">
+                            <div className="text-lg font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                              {detail.visitor?.totalMessages ?? messages.length}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Messages
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Details */}
+                        <div className="space-y-2.5 text-xs">
+                          <div className="flex items-start gap-2">
+                            <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                            <div>
+                              <div className="text-muted-foreground">First seen</div>
+                              <div className="font-medium">
+                                {timeAgo(detail.visitor?.firstSeen || detail.createdAt)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <MessageSquare className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                            <div>
+                              <div className="text-muted-foreground">Channel</div>
+                              <div className="font-medium">{detail.channel}</div>
+                            </div>
+                          </div>
+                          {detail.assignedAgent && (
+                            <div className="flex items-start gap-2">
+                              <Headphones className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                              <div>
+                                <div className="text-muted-foreground">Assigned to</div>
+                                <div className="font-medium">{detail.assignedAgent.name}</div>
+                              </div>
+                            </div>
+                          )}
+                          {detail.satisfaction !== null && (
+                            <div className="flex items-start gap-2">
+                              <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+                              <div>
+                                <div className="text-muted-foreground">Satisfaction</div>
+                                <div className="font-medium">
+                                  {detail.satisfaction}/5
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Visitor ID */}
+                        <div className="pt-3 border-t">
+                          <div className="text-[10px] text-muted-foreground mb-1">
+                            Visitor ID
+                          </div>
+                          <code className="text-[10px] bg-muted px-2 py-1 rounded block break-all">
+                            {detail.visitorId}
+                          </code>
+                        </div>
+                      </div>
+                    )}
+                  </SheetContent>
+                </Sheet>
                 </div>
                 {/* /Messages + Visitor panel row */}
               </>
@@ -1452,56 +1996,164 @@ export default function ConversationsPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border bg-card shadow-2xl px-5 py-3"
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border bg-card shadow-2xl px-4 py-2.5"
             >
-              <span className="text-sm font-medium">
+              <Badge variant="secondary" className="gap-1.5 h-6">
+                <CheckSquare className="size-3" />
                 {selectedConvos.size} selected
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={async () => {
-                  for (const id of selectedConvos) {
-                    try {
-                      await fetch(`/api/conversations/${id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "CLOSED" }),
-                      });
-                    } catch { /* ignore */ }
-                  }
-                  clearSelection();
-                  void fetchList();
-                }}
-              >
-                <X className="size-3.5" />
-                Close selected
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={async () => {
-                  for (const id of selectedConvos) {
-                    try {
-                      await fetch(`/api/conversations/${id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "HUMAN", assignedToId: "me" }),
-                      });
-                    } catch { /* ignore */ }
-                  }
-                  clearSelection();
-                  void fetchList();
-                }}
-              >
-                <UserCheck className="size-3.5" />
-                Assign to me
-              </Button>
+              </Badge>
+              <Separator orientation="vertical" className="h-6" />
+              {/* Select all / deselect all */}
               <Button
                 size="sm"
                 variant="ghost"
+                className="gap-1.5 h-7 text-xs"
+                onClick={() => {
+                  if (selectedConvos.size === filteredConversations.length) {
+                    clearSelection();
+                  } else {
+                    setSelectedConvos(new Set(filteredConversations.map((c) => c.id)));
+                  }
+                }}
+              >
+                {selectedConvos.size === filteredConversations.length ? (
+                  <>
+                    <Square className="size-3" />
+                    Deselect all
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="size-3" />
+                    Select all
+                  </>
+                )}
+              </Button>
+              <Separator orientation="vertical" className="h-6" />
+              {/* Close all */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 h-7 text-xs"
+                onClick={async () => {
+                  const ids = [...selectedConvos];
+                  await Promise.allSettled(
+                    ids.map((id) =>
+                      fetch(`/api/conversations/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "CLOSED" }),
+                      })
+                    )
+                  );
+                  // Optimistically update local state
+                  setConversations((prev) =>
+                    prev.map((c) => ids.includes(c.id) ? { ...c, status: "CLOSED" as ConvStatus } : c)
+                  );
+                  clearSelection();
+                }}
+              >
+                <X className="size-3" />
+                Close all
+              </Button>
+              {/* Assign to dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
+                    <Users className="size-3" />
+                    Assign to
+                    <ChevronDown className="size-3 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52">
+                  <DropdownMenuLabel className="text-xs">Assign to</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const ids = [...selectedConvos];
+                      await Promise.allSettled(
+                        ids.map((id) =>
+                          fetch(`/api/conversations/${id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ assignedToId: null }),
+                          })
+                        )
+                      );
+                      setConversations((prev) =>
+                        prev.map((c) => ids.includes(c.id) ? { ...c, assignedToId: null } : c)
+                      );
+                      clearSelection();
+                    }}
+                  >
+                    <UserIcon className="size-3.5 mr-2" />
+                    Unassign
+                  </DropdownMenuItem>
+                  {members.map((m) => (
+                    <DropdownMenuItem
+                      key={m.id}
+                      onClick={async () => {
+                        const ids = [...selectedConvos];
+                        await Promise.allSettled(
+                          ids.map((id) =>
+                            fetch(`/api/conversations/${id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ assignedToId: m.id, status: "HUMAN" }),
+                            })
+                          )
+                        );
+                        setConversations((prev) =>
+                          prev.map((c) =>
+                            ids.includes(c.id)
+                              ? { ...c, assignedToId: m.id, status: "HUMAN" as ConvStatus }
+                              : c
+                          )
+                        );
+                        clearSelection();
+                      }}
+                    >
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-[9px] font-semibold mr-2">
+                        {m.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="truncate">{m.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Mark as read */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 h-7 text-xs"
+                onClick={() => {
+                  setUnread((prev) => {
+                    const next = { ...prev };
+                    for (const id of selectedConvos) {
+                      delete next[id];
+                    }
+                    return next;
+                  });
+                  clearSelection();
+                }}
+              >
+                <Eye className="size-3" />
+                Mark as read
+              </Button>
+              {/* Delete with confirmation */}
+              <Button
+                size="sm"
+                variant="destructive"
+                className="gap-1.5 h-7 text-xs"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="size-3" />
+                Delete
+              </Button>
+              <Separator orientation="vertical" className="h-6" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
                 onClick={clearSelection}
               >
                 Cancel
@@ -1509,6 +2161,43 @@ export default function ConversationsPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {selectedConvos.size} conversation{selectedConvos.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. The selected conversations and all their messages will be permanently deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  const ids = [...selectedConvos];
+                  await Promise.allSettled(
+                    ids.map((id) =>
+                      fetch(`/api/conversations/${id}`, {
+                        method: "DELETE",
+                      })
+                    )
+                  );
+                  setConversations((prev) => prev.filter((c) => !ids.includes(c.id)));
+                  clearSelection();
+                  setShowDeleteDialog(false);
+                  // If the currently selected conversation was deleted, deselect it
+                  if (selectedId && ids.includes(selectedId)) {
+                    setSelectedId(null);
+                  }
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );
@@ -1676,14 +2365,17 @@ function ListSkeleton() {
 function EmptyList({ onClearFilters, hasFilters }: { onClearFilters: () => void; hasFilters: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-16 px-6">
-      <div className="size-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
-        <Inbox className="size-8 opacity-40" />
+      <div className="relative mb-5">
+        <div className="absolute inset-0 bg-violet-500/10 blur-2xl rounded-full" />
+        <div className="relative size-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center border border-violet-200/50 dark:border-violet-700/30">
+          <Inbox className="size-8 opacity-50" />
+        </div>
       </div>
       <p className="text-sm font-medium">No conversations found</p>
-      <p className="text-xs mt-1 max-w-[200px]">
+      <p className="text-xs mt-1 max-w-[220px] leading-relaxed">
         {hasFilters
           ? "Try adjusting your search or filter to find what you're looking for."
-          : "Conversations will appear here when visitors start chatting."}
+          : "Conversations will appear here when visitors start chatting with your chatbot."}
       </p>
       {hasFilters && (
         <Button
@@ -1693,7 +2385,7 @@ function EmptyList({ onClearFilters, hasFilters }: { onClearFilters: () => void;
           onClick={onClearFilters}
         >
           <X className="size-3" />
-          Clear filters
+          Clear all filters
         </Button>
       )}
     </div>

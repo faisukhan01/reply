@@ -149,3 +149,30 @@ export async function PATCH(
 
   return NextResponse.json({ conversation: updated });
 }
+
+/**
+ * DELETE /api/conversations/[id]
+ * Deletes a conversation and all its messages.
+ */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const conv = await getOwnedConversation(id, user.orgId);
+  if (!conv) {
+    return NextResponse.json(
+      { error: "Conversation not found" },
+      { status: 404 }
+    );
+  }
+
+  await db.conversation.delete({ where: { id } });
+
+  return NextResponse.json({ success: true });
+}

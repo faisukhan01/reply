@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Minus, MessageSquare, AlertCircle, Star, Heart } from "lucide-react";
+import { Bot, Send, Minus, MessageSquare, AlertCircle, Star, Heart, Headphones, DollarSign, Clock, Check, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type WidgetConfig = {
@@ -19,6 +19,8 @@ type ChatMsg = {
   id: string;
   role: "VISITOR" | "AI";
   content: string;
+  timestamp?: number;
+  read?: boolean;
 };
 
 const VISITOR_ID_KEY = "replyai_visitor_id";
@@ -62,9 +64,9 @@ function storeVisitorName(name: string) {
 }
 
 const QUICK_ACTIONS = [
-  { label: "Pricing info", message: "I'd like to know about pricing" },
-  { label: "Business hours", message: "What are your business hours?" },
-  { label: "Talk to a human", message: "I'd like to speak with a human agent" },
+  { label: "Pricing", message: "I'd like to know about pricing", icon: DollarSign },
+  { label: "Hours", message: "What are your business hours?", icon: Clock },
+  { label: "Talk to human", message: "I'd like to speak with a human agent", icon: Headphones },
 ];
 
 export default function WidgetPage() {
@@ -126,6 +128,8 @@ export default function WidgetPage() {
               content:
                 data.welcomeMessage ||
                 "Hi! How can I help you today?",
+              timestamp: Date.now(),
+              read: true,
             },
           ]);
         } else {
@@ -161,10 +165,13 @@ export default function WidgetPage() {
     const text = (textOverride ?? input).trim();
     if (!text || sending || !config || paused) return;
 
+    const now = Date.now();
     const visitorMsg: ChatMsg = {
-      id: "v-" + Date.now(),
+      id: "v-" + now,
       role: "VISITOR",
       content: text,
+      timestamp: now,
+      read: false,
     };
     setMessages((prev) => [...prev, visitorMsg]);
     setInput("");
@@ -182,13 +189,20 @@ export default function WidgetPage() {
         }),
       });
       const data = await res.json();
+      const replyTime = Date.now();
       const reply: ChatMsg = {
-        id: "a-" + Date.now(),
+        id: "a-" + replyTime,
         role: "AI",
         content:
           (data && data.reply) ||
           "Sorry, I didn't quite catch that. Could you rephrase?",
+        timestamp: replyTime,
+        read: true,
       };
+      // Mark previous visitor messages as read
+      setMessages((prev) =>
+        prev.map((m) => (m.role === "VISITOR" && !m.read ? { ...m, read: true } : m))
+      );
       setMessages((prev) => [...prev, reply]);
       if (data?.conversationId) {
         setConversationId(data.conversationId);
@@ -310,6 +324,7 @@ export default function WidgetPage() {
 
   // ---------- Minimized state ----------
   if (!widgetOpen) {
+    const hasMessages = messages.length > 1;
     return (
       <div
         className="h-screen w-full flex items-end justify-end p-4 bg-transparent"
@@ -318,13 +333,24 @@ export default function WidgetPage() {
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
           onClick={() => setWidgetOpen(true)}
           aria-label="Open chat"
-          className="h-14 w-14 rounded-full bg-[var(--bot-color)] text-white shadow-2xl flex items-center justify-center"
+          className="relative h-14 w-14 rounded-full bg-[var(--bot-color)] text-white shadow-2xl flex items-center justify-center"
         >
           <MessageSquare className="h-6 w-6" />
+          {hasMessages && (
+            <>
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-4 w-4 rounded-full bg-rose-500 text-[9px] font-bold items-center justify-center">
+                  {messages.filter(m => m.role === "AI" && m.id !== "welcome").length}
+                </span>
+              </span>
+              <span className="absolute inset-0 rounded-full animate-glow-pulse" />
+            </>
+          )}
         </motion.button>
       </div>
     );
@@ -393,16 +419,22 @@ export default function WidgetPage() {
                 transition={{ duration: 0.2 }}
                 className="flex flex-wrap gap-2 pt-2"
               >
-                {QUICK_ACTIONS.map((action) => (
-                  <button
-                    key={action.label}
-                    onClick={() => handleSend(action.message)}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium text-white transition-all hover:opacity-90 active:scale-95"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    {action.label}
-                  </button>
-                ))}
+                {QUICK_ACTIONS.map((action) => {
+                  const ActionIcon = action.icon;
+                  return (
+                    <motion.button
+                      key={action.label}
+                      onClick={() => handleSend(action.message)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white transition-all hover:shadow-lg"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      <ActionIcon className="h-3 w-3" />
+                      {action.label}
+                    </motion.button>
+                  );
+                })}
               </motion.div>
             )}
           </AnimatePresence>
@@ -581,12 +613,24 @@ export default function WidgetPage() {
   );
 }
 
+function formatMsgTime(ts?: number): string {
+  if (!ts) return "";
+  const now = Date.now();
+  const diff = now - ts;
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 function Bubble({
   msg,
   primaryColor,
+  showTimestamp,
 }: {
   msg: ChatMsg;
   primaryColor: string;
+  showTimestamp?: boolean;
 }) {
   const isVisitor = msg.role === "VISITOR";
   return (
@@ -607,20 +651,42 @@ function Bubble({
           <Bot className="h-4 w-4" />
         </div>
       )}
-      <div
-        className={cn(
-          "max-w-[78%] px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm",
-          isVisitor
-            ? "text-white rounded-2xl rounded-br-md"
-            : "bg-muted text-foreground rounded-2xl rounded-bl-md"
+      <div className={cn("max-w-[78%]", isVisitor ? "flex flex-col items-end" : "flex flex-col items-start")}>
+        <div
+          className={cn(
+            "px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm",
+            isVisitor
+              ? "text-white rounded-2xl rounded-br-md"
+              : "bg-muted text-foreground rounded-2xl rounded-bl-md"
+          )}
+          style={
+            isVisitor
+              ? { backgroundColor: primaryColor }
+              : undefined
+          }
+        >
+          {msg.content}
+        </div>
+        {/* Timestamp + Read receipt */}
+        {(showTimestamp || msg.timestamp) && (
+          <div className={cn(
+            "flex items-center gap-1 mt-0.5 px-1",
+            isVisitor ? "flex-row-reverse" : "flex-row"
+          )}>
+            <span className="text-[10px] text-muted-foreground/70">
+              {formatMsgTime(msg.timestamp)}
+            </span>
+            {isVisitor && (
+              <span className="text-muted-foreground/50">
+                {msg.read ? (
+                  <CheckCheck className="h-3 w-3" />
+                ) : (
+                  <Check className="h-3 w-3" />
+                )}
+              </span>
+            )}
+          </div>
         )}
-        style={
-          isVisitor
-            ? { backgroundColor: primaryColor }
-            : undefined
-        }
-      >
-        {msg.content}
       </div>
     </motion.div>
   );
