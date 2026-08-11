@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -22,6 +33,7 @@ import {
   Sparkles,
   Rocket,
   RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +44,7 @@ type Chatbot = {
   primaryColor: string;
   status: string;
   position: string;
+  persona?: string;
 };
 
 const COLOR_SWATCHES = [
@@ -46,6 +59,13 @@ const COLOR_SWATCHES = [
 const POSITIONS = [
   { value: "bottom-right", label: "Bottom Right" },
   { value: "bottom-left", label: "Bottom Left" },
+];
+
+const PERSONAS = [
+  { value: "friendly", label: "Friendly" },
+  { value: "professional", label: "Professional" },
+  { value: "concise", label: "Concise" },
+  { value: "playful", label: "Playful" },
 ];
 
 const STEPS = [
@@ -71,12 +91,16 @@ export default function WidgetDemoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [origin, setOrigin] = useState("");
 
-  // For the visual customization preview.
+  // Customization state
   const [selectedColor, setSelectedColor] = useState<string>("#8b5cf6");
   const [selectedPosition, setSelectedPosition] = useState<string>("bottom-right");
+  const [customName, setCustomName] = useState<string>("");
+  const [customWelcome, setCustomWelcome] = useState<string>("");
+  const [customPersona, setCustomPersona] = useState<string>("friendly");
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -92,8 +116,6 @@ export default function WidgetDemoPage() {
         }
         const data = await res.json();
         if (cancelled) return;
-        // The chatbot API might return either a single bot or { chatbot: ... };
-        // handle both shapes defensively.
         const botData: Chatbot | null = data?.id
           ? data
           : data?.chatbot?.id
@@ -105,6 +127,9 @@ export default function WidgetDemoPage() {
           setBot(botData);
           setSelectedColor(botData.primaryColor || "#8b5cf6");
           setSelectedPosition(botData.position || "bottom-right");
+          setCustomName(botData.name || "");
+          setCustomWelcome(botData.welcomeMessage || "");
+          setCustomPersona(botData.persona || "friendly");
         } else {
           setError("No chatbot found for your organization.");
         }
@@ -120,17 +145,30 @@ export default function WidgetDemoPage() {
     };
   }, []);
 
-  const embedCode = bot
-    ? `<!-- ReplyAI Widget -->
-<script src="${origin}/widget.js" data-bot-id="${bot.id}" async></script>`
-    : "";
+  // Generate embed code that updates with customization
+  const embedCode = useMemo(() => {
+    if (!bot) return "";
+    const attrs: string[] = [
+      `data-bot-id="${bot.id}"`,
+    ];
+    if (selectedColor !== bot.primaryColor) {
+      attrs.push(`data-color="${selectedColor}"`);
+    }
+    if (selectedPosition !== "bottom-right") {
+      attrs.push(`data-position="${selectedPosition}"`);
+    }
+    return `<!-- ReplyAI Widget -->
+<script src="${origin}/widget.js" ${attrs.join(" ")} async></script>`;
+  }, [bot, origin, selectedColor, selectedPosition]);
 
   async function copyEmbed() {
     if (!embedCode) return;
     try {
       await navigator.clipboard.writeText(embedCode);
       setCopied(true);
+      setCopySuccess(true);
       setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopySuccess(false), 3000);
     } catch (e) {
       console.error("clipboard copy failed", e);
     }
@@ -163,107 +201,222 @@ export default function WidgetDemoPage() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-          {/* LEFT: explanation + embed code */}
-          <div className="space-y-6">
-            {/* Embed code card */}
-            <Card className="overflow-hidden border-violet-200/60 dark:border-violet-900/40">
+        {/* Main grid: customization panel | live preview */}
+        <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+          {/* LEFT: Customization panel */}
+          <div className="space-y-6 lg:col-span-1">
+            <Card className="overflow-hidden">
               <CardHeader className="bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/30">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Palette className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                  Customize
+                </CardTitle>
+                <CardDescription>
+                  Tweak the widget appearance and see changes live.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5 pt-4">
+                {/* Primary color */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Accent color</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {COLOR_SWATCHES.map((c) => {
+                      const active = selectedColor.toLowerCase() === c.value.toLowerCase();
+                      return (
+                        <Tooltip key={c.value}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => setSelectedColor(c.value)}
+                              className={cn(
+                                "h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110",
+                                active
+                                  ? "ring-2 ring-offset-2 ring-offset-background ring-foreground"
+                                  : "ring-1 ring-border"
+                              )}
+                              style={{ backgroundColor: c.value }}
+                              aria-label={c.name}
+                            >
+                              {active && (
+                                <Check className="h-3.5 w-3.5 text-white drop-shadow" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>{c.name}</TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="color"
+                      value={selectedColor}
+                      onChange={(e) => setSelectedColor(e.target.value)}
+                      className="h-8 w-12 cursor-pointer p-0.5"
+                      aria-label="Custom color"
+                    />
+                    <Input
+                      value={selectedColor}
+                      onChange={(e) => setSelectedColor(e.target.value)}
+                      className="h-8 w-24 font-mono text-xs"
+                      maxLength={7}
+                      aria-label="Color hex"
+                    />
+                  </div>
+                </div>
+
+                {/* Bot name */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Bot name</Label>
+                  <Input
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="Support Bot"
+                    className="h-8 text-sm"
+                  />
+                </div>
+
+                {/* Welcome message */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Welcome message</Label>
+                  <Textarea
+                    value={customWelcome}
+                    onChange={(e) => setCustomWelcome(e.target.value)}
+                    placeholder="Hi! How can I help you today?"
+                    rows={2}
+                    className="text-sm resize-none"
+                  />
+                </div>
+
+                {/* Persona */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Persona</Label>
+                  <Select value={customPersona} onValueChange={setCustomPersona}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PERSONAS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Position */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Position</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {POSITIONS.map((p) => {
+                      const active = selectedPosition === p.value;
+                      return (
+                        <button
+                          key={p.value}
+                          onClick={() => setSelectedPosition(p.value)}
+                          className={cn(
+                            "relative h-16 rounded-lg border-2 transition-all overflow-hidden",
+                            active
+                              ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30"
+                              : "border-border bg-muted/40 hover:border-violet-300"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "absolute h-4 w-4 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-sm",
+                              p.value === "bottom-right"
+                                ? "bottom-1.5 right-1.5"
+                                : "bottom-1.5 left-1.5"
+                            )}
+                          />
+                          <div className="absolute top-1.5 left-1.5 text-[9px] font-medium text-muted-foreground">
+                            {p.label}
+                          </div>
+                          {active && (
+                            <div className="absolute top-1 right-1 h-3.5 w-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center">
+                              <Check className="h-2 w-2" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Code snippet card */}
+            <Card className="overflow-hidden border-violet-200/60 dark:border-violet-900/40">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Code2 className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                   Embed code
                 </CardTitle>
                 <CardDescription>
-                  Paste this snippet just before the closing{" "}
+                  Paste before{" "}
                   <code className="px-1 py-0.5 rounded bg-muted text-xs font-mono">
                     &lt;/body&gt;
-                  </code>{" "}
-                  tag on any page where you want the widget to appear.
+                  </code>
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-4 space-y-3">
+              <CardContent className="space-y-3">
                 {loading ? (
-                  <div className="h-24 rounded-lg bg-muted animate-pulse" />
+                  <div className="h-20 rounded-lg bg-muted animate-pulse" />
                 ) : error ? (
                   <div className="text-sm text-destructive">{error}</div>
                 ) : (
                   <>
-                    <pre className="text-xs leading-relaxed bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto font-mono scroll-thin">
+                    <pre className="text-[11px] leading-relaxed bg-zinc-950 text-zinc-100 rounded-lg p-3 overflow-x-auto font-mono scroll-thin">
                       {embedCode}
                     </pre>
                     <div className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            onClick={copyEmbed}
-                            disabled={!embedCode}
-                            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90"
-                          >
-                            {copied ? (
-                              <>
-                                <Check className="h-4 w-4 mr-2" />
-                                Copied!
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy snippet
-                              </>
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {copied ? "Copied to clipboard" : "Copy to clipboard"}
-                        </TooltipContent>
-                      </Tooltip>
-                      <span className="text-xs text-muted-foreground">
-                        No build step required
-                      </span>
+                      <Button
+                        onClick={copyEmbed}
+                        disabled={!embedCode}
+                        size="sm"
+                        className={cn(
+                          "gap-1.5 transition-all",
+                          copySuccess
+                            ? "bg-emerald-600 hover:bg-emerald-700"
+                            : "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90"
+                        )}
+                      >
+                        <AnimatePresence mode="wait">
+                          {copied ? (
+                            <motion.span
+                              key="check"
+                              initial={{ scale: 0, rotate: -90 }}
+                              animate={{ scale: 1, rotate: 0 }}
+                              exit={{ scale: 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                              className="flex items-center"
+                            >
+                              <Check className="h-3.5 w-3.5 mr-1" />
+                              Copied!
+                            </motion.span>
+                          ) : (
+                            <motion.span
+                              key="copy"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="flex items-center"
+                            >
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              Copy snippet
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </Button>
                     </div>
                   </>
                 )}
               </CardContent>
             </Card>
-
-            {/* How it works */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Rocket className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
-                  How it works
-                </CardTitle>
-                <CardDescription>
-                  From sign-up to live chat in under five minutes.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {STEPS.map((s, i) => {
-                  const Icon = s.icon;
-                  return (
-                    <div key={i} className="flex items-start gap-4">
-                      <div className="relative shrink-0">
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center shadow-md shadow-violet-500/20">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-background border-2 border-violet-300 dark:border-violet-700 text-[10px] font-bold flex items-center justify-center text-violet-700 dark:text-violet-300">
-                          {i + 1}
-                        </span>
-                      </div>
-                      <div className="flex-1 pt-0.5">
-                        <div className="text-sm font-semibold">{s.title}</div>
-                        <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
-                          {s.desc}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
           </div>
 
-          {/* RIGHT: live preview iframe */}
-          <div className="space-y-4 lg:sticky lg:top-6">
+          {/* RIGHT: live preview iframe - spans 2 cols */}
+          <div className="space-y-4 lg:col-span-2 lg:sticky lg:top-6">
             <Card className="overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -271,21 +424,29 @@ export default function WidgetDemoPage() {
                     <Smartphone className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                     Live preview
                   </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        onClick={() => setIframeKey((k) => k + 1)}
-                        disabled={!bot}
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Reload
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Refresh the widget preview</TooltipContent>
-                  </Tooltip>
+                  <div className="flex items-center gap-2">
+                    <Button asChild variant="ghost" size="sm" className="h-8 gap-1.5 text-xs">
+                      <a href={bot ? `/widget/${bot.id}` : "#"} target="_blank" rel="noopener">
+                        <ExternalLink className="h-3 w-3" />
+                        Open
+                      </a>
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
+                          onClick={() => setIframeKey((k) => k + 1)}
+                          disabled={!bot}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Reload
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Refresh the widget preview</TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
                 <CardDescription>
                   This is the actual widget your visitors will see. Try chatting!
@@ -300,6 +461,38 @@ export default function WidgetDemoPage() {
                     <div className="relative w-[380px] max-w-[88vw] h-[560px] max-h-[70vh] rounded-[2rem] border-8 border-gray-800 dark:border-gray-900 shadow-2xl overflow-hidden bg-white">
                       {/* notch */}
                       <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 h-5 w-28 bg-gray-800 dark:bg-gray-900 rounded-b-2xl" />
+                      {/* Customization preview overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 z-10 p-3">
+                        <div className="rounded-xl overflow-hidden shadow-lg" style={{ backgroundColor: selectedColor }}>
+                          <div className="px-3 py-2 flex items-center gap-2 text-white">
+                            <div className="size-6 rounded-full bg-white/20 flex items-center justify-center">
+                              <Bot className="size-3" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold truncate">{customName || bot.name}</div>
+                              <div className="text-[10px] text-white/70 capitalize">{customPersona}</div>
+                            </div>
+                          </div>
+                          <div className="bg-white p-2 space-y-2">
+                            <div className="flex items-start gap-1.5">
+                              <div className="size-4 rounded-full flex items-center justify-center text-white shrink-0" style={{ backgroundColor: selectedColor }}>
+                                <Bot className="size-2.5" />
+                              </div>
+                              <div className="rounded-lg bg-gray-100 px-2 py-1 text-[11px] text-gray-700 max-w-[85%]">
+                                {customWelcome || bot.welcomeMessage || "Hi! How can I help you today?"}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 rounded-full bg-gray-100 px-2 py-1 text-[10px] text-gray-400">
+                                Type a message…
+                              </div>
+                              <div className="size-5 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: selectedColor }}>
+                                <MessageSquare className="size-2.5" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       {bot.status === "PAUSED" ? (
                         <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 gap-2">
                           <Bot className="h-10 w-10 text-muted-foreground" />
@@ -331,112 +524,40 @@ export default function WidgetDemoPage() {
           </div>
         </div>
 
-        {/* Customization section (visual only) */}
+        {/* How it works */}
         <Separator />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Palette className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
-              Customization
+              <Rocket className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
+              How it works
             </CardTitle>
             <CardDescription>
-              Visual preview of available options. Edit the live values in the{" "}
-              <span className="font-medium text-foreground">AI Chatbot</span>{" "}
-              tab.
+              From sign-up to live chat in under five minutes.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid sm:grid-cols-2 gap-8">
-            {/* Color swatches */}
-            <div className="space-y-3">
-              <div className="text-sm font-medium">Accent color</div>
-              <div className="flex flex-wrap gap-2.5">
-                {COLOR_SWATCHES.map((c) => {
-                  const active = selectedColor.toLowerCase() === c.value.toLowerCase();
-                  return (
-                    <Tooltip key={c.value}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setSelectedColor(c.value)}
-                          className={cn(
-                            "h-10 w-10 rounded-full flex items-center justify-center transition-all hover:scale-110",
-                            active
-                              ? "ring-2 ring-offset-2 ring-offset-background ring-foreground"
-                              : "ring-1 ring-border"
-                          )}
-                          style={{ backgroundColor: c.value }}
-                          aria-label={c.name}
-                        >
-                          {active && (
-                            <Check className="h-4 w-4 text-white drop-shadow" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>{c.name}</TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-2 pt-2">
-                <div
-                  className="h-8 w-8 rounded-md ring-1 ring-border"
-                  style={{ backgroundColor: selectedColor }}
-                />
-                <code className="text-xs font-mono text-muted-foreground">
-                  {selectedColor}
-                </code>
-              </div>
-            </div>
-
-            {/* Position options */}
-            <div className="space-y-3">
-              <div className="text-sm font-medium">Widget position</div>
-              <div className="grid grid-cols-2 gap-2.5">
-                {POSITIONS.map((p) => {
-                  const active = selectedPosition === p.value;
-                  return (
-                    <button
-                      key={p.value}
-                      onClick={() => setSelectedPosition(p.value)}
-                      className={cn(
-                        "relative h-24 rounded-lg border-2 transition-all overflow-hidden",
-                        active
-                          ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30"
-                          : "border-border bg-muted/40 hover:border-violet-300"
-                      )}
-                    >
-                      <div className="absolute inset-0 p-2">
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                          Screen
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          "absolute h-5 w-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-md",
-                          p.value === "bottom-right"
-                            ? "bottom-2 right-2"
-                            : "bottom-2 left-2"
-                        )}
-                      />
-                      <div
-                        className={cn(
-                          "absolute bottom-1 text-[10px] font-medium",
-                          p.value === "bottom-right"
-                            ? "right-9"
-                            : "left-9"
-                        )}
-                      >
-                        {p.label}
-                      </div>
-                      {active && (
-                        <div className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-violet-600 text-white flex items-center justify-center">
-                          <Check className="h-2.5 w-2.5" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <CardContent className="space-y-5">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="relative shrink-0">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center shadow-md shadow-violet-500/20">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-background border-2 border-violet-300 dark:border-violet-700 text-[10px] font-bold flex items-center justify-center text-violet-700 dark:text-violet-300">
+                      {i + 1}
+                    </span>
+                  </div>
+                  <div className="flex-1 pt-0.5">
+                    <div className="text-sm font-semibold">{s.title}</div>
+                    <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
+                      {s.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 

@@ -122,21 +122,28 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — improved with rounded thumb, transparent track, hover expansion */
 .scroll-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  opacity: 0.4;
+  background: oklch(0.7 0.01 280 / 25%);
   border-radius: 9999px;
+  transition: width 0.15s ease, background 0.15s ease;
 }
 .scroll-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
+  background: oklch(0.55 0.12 295 / 50%);
+  width: 8px;
+}
+.dark .scroll-thin::-webkit-scrollbar-thumb {
+  background: oklch(0.5 0.01 280 / 30%);
+}
+.dark .scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.65 0.12 295 / 55%);
 }
 
 /* Grid background pattern */
@@ -410,3 +417,45 @@
     size: landscape;
   }
 }
+
+/* ─── New micro-interaction animations ─────────────────────────── */
+
+/* Slower shimmer for cards (3s instead of 1.5s) */
+@keyframes shimmer-slow {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer-slow {
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 8%), transparent);
+  background-size: 200% 100%;
+  animation: shimmer-slow 3s infinite;
+}
+
+/* Very subtle floating animation for decorative elements */
+@keyframes float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.animate-float-subtle {
+  animation: float-subtle 4s ease-in-out infinite;
+}
+
+/* Animated border glow effect */
+@keyframes border-glow {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.55 0.22 295 / 0%), inset 0 0 0 0 oklch(0.55 0.22 295 / 0%); }
+  50% { box-shadow: 0 0 12px 2px oklch(0.55 0.22 295 / 15%), inset 0 0 8px 0 oklch(0.55 0.22 295 / 5%); }
+}
+.animate-border-glow {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* Focus ring pulse — subtle pulse animation on focus rings for better accessibility */
+@keyframes focus-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px oklch(0.55 0.22 295 / 30%); }
+  50% { box-shadow: 0 0 0 4px oklch(0.55 0.22 295 / 15%); }
+}
+.focus-ring-pulse:focus-visible {
+  animation: focus-ring-pulse 1.5s ease-in-out infinite;
+  outline: none;
+}
+

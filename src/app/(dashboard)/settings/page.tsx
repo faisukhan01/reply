@@ -20,6 +20,11 @@ import {
   ExternalLink,
   TestTube,
   RefreshCw,
+  Shield,
+  Headphones,
+  CheckCircle2,
+  X,
+  ChevronDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -74,7 +79,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SavedRepliesTab } from "@/components/dashboard/saved-replies-tab";
+import { cn } from "@/lib/utils";
 
 type Member = {
   id: string;
@@ -152,10 +164,37 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+// Role badge styles
+const roleStyles: Record<string, { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
+  OWNER: { bg: "bg-violet-100 dark:bg-violet-950/40", text: "text-violet-700 dark:text-violet-300", icon: Crown },
+  ADMIN: { bg: "bg-emerald-100 dark:bg-emerald-950/40", text: "text-emerald-700 dark:text-emerald-300", icon: Shield },
+  AGENT: { bg: "bg-amber-100 dark:bg-amber-950/40", text: "text-amber-700 dark:text-amber-300", icon: Headphones },
+};
+
+const roleDescriptions: Record<string, string> = {
+  OWNER: "Full access — delete org, manage billing, invite/remove members, change roles.",
+  ADMIN: "Can invite members, manage chatbot, view all conversations.",
+  AGENT: "Can view assigned conversations, reply to conversations, view contacts.",
+};
+
+const permissionsMatrix = [
+  { permission: "Delete organization", OWNER: true, ADMIN: false, AGENT: false },
+  { permission: "Manage billing", OWNER: true, ADMIN: false, AGENT: false },
+  { permission: "Invite/remove members", OWNER: true, ADMIN: true, AGENT: false },
+  { permission: "Change member roles", OWNER: true, ADMIN: false, AGENT: false },
+  { permission: "Manage chatbot settings", OWNER: true, ADMIN: true, AGENT: false },
+  { permission: "View all conversations", OWNER: true, ADMIN: true, AGENT: false },
+  { permission: "View assigned conversations", OWNER: true, ADMIN: true, AGENT: true },
+  { permission: "Reply to conversations", OWNER: true, ADMIN: true, AGENT: true },
+  { permission: "View contacts", OWNER: true, ADMIN: true, AGENT: true },
+];
+
 export default function SettingsPage() {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<string>("AGENT");
 
   const [orgName, setOrgName] = useState("");
   const [savingOrg, setSavingOrg] = useState(false);
@@ -169,6 +208,11 @@ export default function SettingsPage() {
     password: "",
     role: "AGENT",
   });
+
+  // role change confirmation dialog
+  const [roleConfirmOpen, setRoleConfirmOpen] = useState(false);
+  const [roleConfirmTarget, setRoleConfirmTarget] = useState<{ memberId: string; memberName: string; newRole: string; oldRole: string } | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
 
   // notifications
   const [notif, setNotif] = useState({
@@ -203,6 +247,8 @@ export default function SettingsPage() {
       setOrg(o);
       setOrgName(o.name);
       setMembers(Array.isArray(o.users) ? (o.users as Member[]) : []);
+      if (data.currentUserId) setCurrentUserId(data.currentUserId);
+      if (data.currentUserRole) setCurrentUserRole(data.currentUserRole);
     } catch (e) {
       toast.error("Could not load organization settings");
     } finally {
@@ -270,6 +316,43 @@ export default function SettingsPage() {
       toast.error(msg);
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleRoleChange(memberId: string, newRole: string) {
+    setChangingRole(true);
+    try {
+      const res = await fetch("/api/settings/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, role: newRole }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        throw new Error(j?.error || "Failed to change role");
+      }
+      const { user: updated } = await res.json();
+      setMembers((prev) =>
+        prev.map((m) => (m.id === updated.id ? (updated as Member) : m))
+      );
+      toast.success(`${updated.name} is now ${updated.role}`);
+      setRoleConfirmOpen(false);
+      setRoleConfirmTarget(null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to change role";
+      toast.error(msg);
+    } finally {
+      setChangingRole(false);
+    }
+  }
+
+  function requestRoleChange(memberId: string, memberName: string, newRole: string, oldRole: string) {
+    // Show confirmation if demoting OWNER or promoting to OWNER
+    if (oldRole === "OWNER" || newRole === "OWNER") {
+      setRoleConfirmTarget({ memberId, memberName, newRole, oldRole });
+      setRoleConfirmOpen(true);
+    } else {
+      handleRoleChange(memberId, newRole);
     }
   }
 
@@ -652,202 +735,355 @@ export default function SettingsPage() {
 
         {/* Members */}
         <TabsContent value="members" className="mt-4">
-          <Card className="rounded-xl border shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Team members</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Invite teammates to collaborate on conversations.
-                </p>
-              </div>
-              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <UserPlus className="h-4 w-4" />
-                    Invite member
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Invite team member</DialogTitle>
-                    <DialogDescription>
-                      Create a new account for a teammate. They&apos;ll be able
-                      to log in with these credentials.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleInvite} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="m-name">
-                        Full name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="m-name"
-                        placeholder="Alex Morgan"
-                        value={inviteForm.name}
-                        onChange={(e) =>
-                          setInviteForm((p) => ({
-                            ...p,
-                            name: e.target.value,
-                          }))
-                        }
-                        autoFocus
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="m-email">
-                        Email <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="m-email"
-                        type="email"
-                        placeholder="alex@acme.com"
-                        value={inviteForm.email}
-                        onChange={(e) =>
-                          setInviteForm((p) => ({
-                            ...p,
-                            email: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="m-password">
-                        Temporary password{" "}
-                        <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="m-password"
-                        type="password"
-                        placeholder="Min 6 characters"
-                        value={inviteForm.password}
-                        onChange={(e) =>
-                          setInviteForm((p) => ({
-                            ...p,
-                            password: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="m-role">Role</Label>
-                      <Select
-                        value={inviteForm.role}
-                        onValueChange={(v) =>
-                          setInviteForm((p) => ({ ...p, role: v }))
-                        }
-                      >
-                        <SelectTrigger id="m-role" className="w-full">
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="AGENT">Agent</SelectItem>
-                          <SelectItem value="ADMIN">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Agents handle conversations. Admins can also manage
-                        settings & billing.
-                      </p>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setInviteOpen(false)}
-                        disabled={inviting}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={inviting}>
-                        {inviting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Inviting…
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="h-4 w-4" />
-                            Invite
-                          </>
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-9 w-9 rounded-full" />
-                      <Skeleton className="h-4 flex-1 max-w-[160px]" />
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-6 w-16" />
-                    </div>
-                  ))}
+          <div className="space-y-4">
+            <Card className="rounded-xl border shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Team members</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Invite teammates to collaborate on conversations.
+                  </p>
                 </div>
-              ) : members.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">
-                  No team members yet. Invite your first teammate.
-                </div>
-              ) : (
+                <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <UserPlus className="h-4 w-4" />
+                      Invite member
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invite team member</DialogTitle>
+                      <DialogDescription>
+                        Create a new account for a teammate. They&apos;ll be able
+                        to log in with these credentials.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleInvite} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="m-name">
+                          Full name <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="m-name"
+                          placeholder="Alex Morgan"
+                          value={inviteForm.name}
+                          onChange={(e) =>
+                            setInviteForm((p) => ({
+                              ...p,
+                              name: e.target.value,
+                            }))
+                          }
+                          autoFocus
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="m-email">
+                          Email <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="m-email"
+                          type="email"
+                          placeholder="alex@acme.com"
+                          value={inviteForm.email}
+                          onChange={(e) =>
+                            setInviteForm((p) => ({
+                              ...p,
+                              email: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="m-password">
+                          Temporary password{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="m-password"
+                          type="password"
+                          placeholder="Min 6 characters"
+                          value={inviteForm.password}
+                          onChange={(e) =>
+                            setInviteForm((p) => ({
+                              ...p,
+                              password: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="m-role">Role</Label>
+                        <Select
+                          value={inviteForm.role}
+                          onValueChange={(v) =>
+                            setInviteForm((p) => ({ ...p, role: v }))
+                          }
+                        >
+                          <SelectTrigger id="m-role" className="w-full">
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AGENT">
+                              <span className="flex items-center gap-2">
+                                <Headphones className="h-3.5 w-3.5 text-amber-600" />
+                                Agent
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="ADMIN">
+                              <span className="flex items-center gap-2">
+                                <Shield className="h-3.5 w-3.5 text-emerald-600" />
+                                Admin
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {roleDescriptions[inviteForm.role] || roleDescriptions.AGENT}
+                        </p>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setInviteOpen(false)}
+                          disabled={inviting}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={inviting}>
+                          {inviting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Inviting…
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="h-4 w-4" />
+                              Invite
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 rounded-full" />
+                        <Skeleton className="h-4 flex-1 max-w-[160px]" />
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-6 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : members.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    No team members yet. Invite your first teammate.
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="pl-4">Member</TableHead>
+                          <TableHead className="hidden sm:table-cell">
+                            Email
+                          </TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Joined
+                          </TableHead>
+                          {currentUserRole === "OWNER" && (
+                            <TableHead className="w-12" />
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {members.map((m) => {
+                          const rs = roleStyles[m.role] || roleStyles.AGENT;
+                          const RoleIcon = rs.icon;
+                          const isSelf = m.id === currentUserId;
+                          const canChangeRole = currentUserRole === "OWNER" && !isSelf;
+
+                          return (
+                            <TableRow key={m.id}>
+                              <TableCell className="pl-4">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-9 w-9">
+                                    <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+                                      {initials(m.name) || "?"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="font-medium">{m.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                                {m.email}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={cn("gap-1 border-0", rs.bg, rs.text)}
+                                >
+                                  <RoleIcon className="h-3 w-3" />
+                                  {m.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                                {formatDate(m.createdAt)}
+                              </TableCell>
+                              {currentUserRole === "OWNER" && (
+                                <TableCell>
+                                  {canChangeRole ? (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        {(["OWNER", "ADMIN", "AGENT"] as const)
+                                          .filter((r) => r !== m.role)
+                                          .map((r) => {
+                                            const rds = roleStyles[r];
+                                            const RdIcon = rds.icon;
+                                            return (
+                                              <DropdownMenuItem
+                                                key={r}
+                                                onClick={() =>
+                                                  requestRoleChange(m.id, m.name, r, m.role)
+                                                }
+                                              >
+                                                <RdIcon className="mr-2 h-4 w-4" />
+                                                Change to {r}
+                                              </DropdownMenuItem>
+                                            );
+                                          })}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground/50">
+                                      {isSelf ? "You" : ""}
+                                    </span>
+                                  )}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Role change confirmation dialog */}
+            <AlertDialog open={roleConfirmOpen} onOpenChange={setRoleConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {roleConfirmTarget?.oldRole === "OWNER"
+                      ? "Demote owner?"
+                      : "Promote to owner?"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {roleConfirmTarget?.oldRole === "OWNER"
+                      ? `You are about to demote ${roleConfirmTarget?.memberName} from Owner to ${roleConfirmTarget?.newRole}. They will lose full access to the organization.`
+                      : `You are about to promote ${roleConfirmTarget?.memberName} to Owner. They will gain full access, including the ability to delete the organization and manage billing.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={changingRole}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={changingRole}
+                    onClick={() => {
+                      if (roleConfirmTarget) {
+                        handleRoleChange(roleConfirmTarget.memberId, roleConfirmTarget.newRole);
+                      }
+                    }}
+                  >
+                    {changingRole ? (
+                      <><Loader2 className="h-4 w-4 animate-spin mr-2" />Changing…</>
+                    ) : (
+                      "Confirm"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Permissions info card */}
+            <Card className="rounded-xl border shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-violet-500" />
+                  Role Permissions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="rounded-lg border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/40">
-                        <TableHead className="pl-4">Member</TableHead>
-                        <TableHead className="hidden sm:table-cell">
-                          Email
+                        <TableHead className="pl-4">Permission</TableHead>
+                        <TableHead className="text-center">
+                          <Badge className="gap-1 border-0 bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300">
+                            <Crown className="h-3 w-3" />
+                            Owner
+                          </Badge>
                         </TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead className="hidden md:table-cell">
-                          Joined
+                        <TableHead className="text-center">
+                          <Badge className="gap-1 border-0 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                            <Shield className="h-3 w-3" />
+                            Admin
+                          </Badge>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <Badge className="gap-1 border-0 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">
+                            <Headphones className="h-3 w-3" />
+                            Agent
+                          </Badge>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {members.map((m) => (
-                        <TableRow key={m.id}>
-                          <TableCell className="pl-4">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-9 w-9">
-                                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
-                                  {initials(m.name) || "?"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium">{m.name}</span>
-                            </div>
+                      {permissionsMatrix.map((row) => (
+                        <TableRow key={row.permission}>
+                          <TableCell className="pl-4 text-sm">{row.permission}</TableCell>
+                          <TableCell className="text-center">
+                            {row.OWNER ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                            ) : (
+                              <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                            )}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                            {m.email}
+                          <TableCell className="text-center">
+                            {row.ADMIN ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                            ) : (
+                              <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                            )}
                           </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                m.role === "OWNER" ? "default" : "secondary"
-                              }
-                              className={
-                                m.role === "ADMIN"
-                                  ? "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
-                                  : ""
-                              }
-                            >
-                              {m.role}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                            {formatDate(m.createdAt)}
+                          <TableCell className="text-center">
+                            {row.AGENT ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                            ) : (
+                              <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Saved Replies */}

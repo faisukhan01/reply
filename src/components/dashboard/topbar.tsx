@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Menu, LogOut, Settings, Sparkles, ChevronDown } from "lucide-react";
+import {
+  Menu,
+  LogOut,
+  Settings,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  Bot,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { NotificationsBell } from "@/components/dashboard/notifications-bell";
 import { CommandPalette } from "@/components/dashboard/command-palette";
@@ -18,8 +27,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
-const titles: Record<string, { title: string; subtitle: string }> = {
+type BreadcrumbItem = { label: string; href?: string };
+
+const pageMeta: Record<string, { title: string; subtitle: string; parent?: BreadcrumbItem }> = {
   "/dashboard": { title: "Dashboard", subtitle: "Your support overview at a glance" },
   "/conversations": { title: "Inbox", subtitle: "Live & recent customer conversations" },
   "/chatbot": { title: "AI Chatbot", subtitle: "Train and customize your AI agent" },
@@ -41,8 +53,46 @@ const mobileNav = [
 
 export function Topbar({ userName, orgName }: { userName: string; orgName: string }) {
   const pathname = usePathname();
-  const meta = titles[pathname] ?? titles["/dashboard"];
   const [open, setOpen] = useState(false);
+  const [botStatus, setBotStatus] = useState<"ACTIVE" | "PAUSED" | null>(null);
+
+  // Determine current page meta and breadcrumbs
+  const exactMeta = pageMeta[pathname];
+  // For sub-pages like /conversations/[id]
+  const basePath = "/" + (pathname?.split("/").filter(Boolean)[0] ?? "");
+  const meta = exactMeta ?? pageMeta[basePath] ?? pageMeta["/dashboard"];
+
+  // Build breadcrumb items
+  const breadcrumbs: BreadcrumbItem[] = [];
+  if (meta.parent) {
+    breadcrumbs.push(meta.parent);
+  }
+  // If we're on a sub-page that isn't exactly matched
+  if (!exactMeta && basePath !== pathname) {
+    breadcrumbs.push({ label: pageMeta[basePath]?.title ?? basePath, href: basePath });
+    // Show the sub-page as the last crumb (no link)
+    const subSegment = pathname?.split("/").filter(Boolean).slice(1).join("/") ?? "";
+    breadcrumbs.push({ label: subSegment.length > 20 ? subSegment.slice(0, 20) + "…" : subSegment });
+  } else {
+    breadcrumbs.push({ label: meta.title });
+  }
+
+  // Fetch bot status
+  useEffect(() => {
+    async function fetchBotStatus() {
+      try {
+        const res = await fetch("/api/chatbot", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setBotStatus(data.chatbot?.status ?? null);
+      } catch {
+        // Silently fail
+      }
+    }
+    fetchBotStatus();
+  }, []);
+
+  const isBotActive = botStatus === "ACTIVE";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 backdrop-blur-md px-4 md:px-6">
@@ -76,14 +126,46 @@ export function Topbar({ userName, orgName }: { userName: string; orgName: strin
         </SheetContent>
       </Sheet>
 
+      {/* Breadcrumb */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-base md:text-lg font-semibold leading-tight truncate">
-          {meta.title}
-        </h1>
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          {breadcrumbs.map((crumb, i) => {
+            const isLast = i === breadcrumbs.length - 1;
+            return (
+              <span key={i} className="flex items-center gap-1">
+                {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />}
+                {crumb.href && !isLast ? (
+                  <Link href={crumb.href} className="hover:text-foreground transition-colors truncate">
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span className={cn("truncate", isLast ? "text-foreground font-semibold text-base md:text-lg leading-tight" : "")}>
+                    {crumb.label}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
         <p className="text-[11px] md:text-xs text-muted-foreground truncate">
           {meta.subtitle}
         </p>
       </div>
+
+      {/* Bot status indicator */}
+      {botStatus !== null && (
+        <Badge
+          className={cn(
+            "h-6 px-2 text-[10px] font-semibold gap-1.5 border-0",
+            isBotActive
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          )}
+        >
+          <Bot className="h-3 w-3" />
+          {isBotActive ? "Active" : "Paused"}
+        </Badge>
+      )}
 
       {/* Command palette trigger (desktop) */}
       <CommandPalette />

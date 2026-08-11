@@ -869,3 +869,160 @@ ReplyAI was stable after round 3 (7+ features added: landing page sections, conv
 5. **Webhook delivery logs**: Track webhook delivery attempts, retries, and failures in a new model.
 6. **Analytics export to PDF**: Enhance the print CSS for a more polished PDF report with branding.
 7. **Localization/i18n**: Support multiple languages in the widget UI and dashboard.
+
+---
+Task ID: 5-A
+Agent: sidebar-roles-ui
+Task: Enhance sidebar with sections/stats, add team roles UI with permissions
+
+Work Log:
+- Added PATCH endpoint to /api/settings/members for role changes (only OWNER can change, can't change own role)
+- Enhanced sidebar with 4 section groupings (Main, Manage, Insights, Config) with separator lines and uppercase labels
+- Added active conversation count badge (rose/red) next to Inbox in sidebar
+- Added gradient left border (violet→fuchsia) for active nav item with framer-motion animation
+- Added keyboard shortcut hints on hover (D, I, C, K, A, W, S) with tooltip support
+- Added user role badge (violet=OWNER, emerald=ADMIN, amber=AGENT) next to name in sidebar
+- Added online status dot (green pulse) next to avatar in sidebar
+- Added quick stats mini bar above upgrade card showing total conversations + active now (with pulse dot)
+- Updated layout.tsx to pass userRole and activeConvCount to Sidebar from server
+- Enhanced topbar with breadcrumb navigation (parent > child for sub-pages)
+- Added "Bot: Active/Paused" status indicator badge in topbar (fetches from chatbot API)
+- Enhanced settings Members tab with role badges using icons (Crown=OWNER, Shield=ADMIN, Headphones=AGENT)
+- Added role change dropdown on each member row (only OWNER can change, can't change own role)
+- Added confirmation dialog for demoting OWNER or promoting to OWNER
+- Added permissions info card below members table with checkmarks/X marks per permission per role
+- Enhanced invite dialog with role selector showing icons and dynamic role descriptions
+- Updated /api/settings GET to return currentUserId and currentUserRole
+- Fixed pre-existing lint errors in widget-demo/page.tsx
+
+Stage Summary:
+- Sidebar now has polished section groupings, active indicators, role badges, and quick stats
+- Members tab has full role management: badges with icons, dropdown for role changes, confirmation dialogs, and permissions matrix
+- Topbar shows breadcrumb navigation and bot status indicator
+- API supports PATCH for member role changes with OWNER-only authorization
+- All lint checks pass cleanly
+
+---
+Task ID: 5-B
+Agent: chatbot-widget-polish
+Task: Polish chatbot page, enhance widget demo, add micro-interactions
+
+Work Log:
+- Read existing chatbot/page.tsx (1339 lines), widget-demo/page.tsx, widget/[botId]/page.tsx, globals.css
+- **Part A: Chatbot Page Polish**
+  - Added count badges on Knowledge and FAQ tab triggers (showing doc count and FAQ count)
+  - Replaced PreviewWidget (full test chat) with MiniWidgetPreview showing compact header + welcome message + placeholder input, updating in real-time
+  - Added search/filter bar to Knowledge Base tab with real-time filtering
+  - Added document type icons (FileText for TEXT, Globe for URL, HelpCircle for FAQ) to KnowledgeCard
+  - Added content size indicator (Short/Medium/Long) badges on KnowledgeCard
+  - Added bulk delete with checkboxes, select all, and animated bulk action bar using framer-motion
+  - Added search bar to FAQs tab with matching count display
+  - Added Import button with BulkImportFaqDialog supporting Q:/A: prefixed paste format
+  - Added alternating subtle backgrounds on FAQ items (even rows get bg-muted/30)
+  - Enhanced Embed tab with animated copy button (spring animation on check icon), QR code SVG placeholder, Widget URL card with direct link, "Test in new tab" link, and mini widget preview
+  - Added framer-motion AnimatePresence for copy success feedback in Embed tab
+- **Part B: Widget Demo Page Enhancement**
+  - Added full customization panel on left side with: primary color picker (6 presets + custom hex input), bot name input, welcome message textarea, persona selector dropdown, position selector
+  - Made layout 3-column grid (customization | live preview spanning 2 cols)
+  - Added code snippet card with real-time embed code generation that updates with customization changes
+  - Added animated copy button with spring animation and success state color change
+  - Added customization preview overlay in phone mockup showing live-updating widget header + welcome message
+  - Added "Open" button to open widget in new tab directly from preview card
+- **Part C: Micro-interactions CSS**
+  - Added `@keyframes shimmer-slow` (3s) and `.animate-shimmer-slow` class
+  - Added `@keyframes float-subtle` (4s gentle float) and `.animate-float-subtle` class
+  - Added `@keyframes border-glow` (3s glow) and `.animate-border-glow` class
+  - Added `@keyframes focus-ring-pulse` and `.focus-ring-pulse:focus-visible` for accessible focus ring pulse
+  - Improved custom scrollbar: smaller default (5px), rounded thumb with oklch colors, hover expansion to 8px, dark mode support
+- Ran `bun run lint` — passed with no errors
+
+Stage Summary:
+- Chatbot page significantly enhanced with tab badges, live mini preview, knowledge search/filter/bulk-delete, FAQ search/import, embed QR code + animated copy
+- Widget demo page rebuilt with full customization panel (color, name, welcome, persona, position), live-updating code snippet, and real-time preview overlay
+- 4 new CSS animation utilities added plus improved scrollbar styling and focus ring pulse
+- All changes use existing shadcn/ui components + framer-motion, no blue/indigo colors
+
+---
+Task ID: CRON-REVIEW-5
+Agent: main (orchestrator) — webDevReview cron round 5
+Task: QA testing + 2 major feature groups (sidebar/team roles, chatbot/widget polish) + micro-interactions
+
+## Current Project Status Assessment
+ReplyAI was stable after round 4 (4 major features: webhook persistence, conversation tags, analytics enhancements, dashboard/contacts polish). This round focused on sidebar4 sidebar enhancements, team roles UI, chatbot page polish, widget demo customization, and micro-interactions CSS. All pages load with zero errors.
+
+## Completed Modifications
+
+### QA Testing
+- Dev server restarted (Firmirin sandbox kills idle processes)
+- Dashboard QA: loads with sidebar active conversation count badge(7) ✅
+- Conversations QA: loads with tags, search, filters ✅
+- Chatbot QA: loads with count badges on tabs (Knowledge 3, FAQs 4) ✅
+- Widget Demo QA: loads with customization panel, color presets, code snippet ✅
+- Settings QA: loads with 7 tabs ✅
+- Lint: 0 errors, 0 warnings ✅
+
+### Feature Group 1: Sidebar + Team Roles (Task 5-A — via subagent)
+
+**Sidebar Enhancements:**
+- Section groupings: 4 sections (Main, Manage, Insights, Config) with uppercase labels and separator lines
+- Active conversation count badge: Rose badge next to "Inbox" showing HUMAN conv count (e.g., "7")
+- Navigation improvements: Gradient left border (violet→fuchsia) on active item, keyboard shortcut hints on hover (D/I/C/K/A/W/S)
+- User section: Role badge ('OWNER' violet, 'ADMIN' emerald, 'AGENT' amber), online status pulse dot
+- Quick stats mini bar: Total conversations + active now count with pulse dot
+
+**Team Roles UI in Settings:**
+- Role badges: Colored badges with icons (Crown=OWNER, Shield=ADMIN, Headphones=AGENT)
+- Role change dropdown: Only OWNER can change roles, can't change own role, confirmation dialog for OWNER promotions/demotions
+- Permissions info card: Full matrix table with checkmarks/X marks for 9 permissions across 3 roles
+- Invite dialog enhancement: Role selector with icons and dynamic description
+
+**Topbar Updates:**
+- Breadcrumb navigation: Current page name with parent > child hierarchy
+- Bot status indicator: "Bot: Active" (emerald) or "Bot: Paused" (amber) badge
+
+**Backend:**
+- PATCH `/api/settings/members`: Role change endpoint with OWNER-only authorization
+- GET `/api/settings`: Now returns currentUserId and currentUserRole
+
+### Feature Group 2: Chatbot + Widget Demo + Micro-interactions (Task 5-B — via subagent)
+
+**Chatbot Page Polish:**
+- Better tab navigation: Count badges on Knowledge (doc count) and FAQ (FAQ count) tabs
+- Configuration tab: MiniWidgetPreview showing compact widget header + welcome message, real-time updates
+- Knowledge base tab: Search/filter bar, document type icons (FileText/Globe/HelpCircle), content size indicators (Short/Medium/Long), bulk delete with checkboxes + select all + animated action bar
+- FAQ tab: Search bar with matching count, Import button with BulkImportFaqDialog (Q:/A: format parsing), alternating subtle backgrounds
+- Embed tab: Animated copy button with spring animation, QR code SVG placeholder, widget URL card, "Test in new tab" button, mini widget preview
+
+**Widget Demo Page Enhancement:**
+- Customization panel: 6 preset colors + custom hex picker, bot name input, welcome message textarea, persona dropdown, position selector — all updating embedded widget in real-time
+- Code snippet section: Real-time embed code generation, animated copy button with spring animation and. success state
+
+**Micro-interactions CSS:**
+- New animations: shimmer-slow (3s), float-subtle (4s gentle float), border-glow (3s glow effect), focus-ring-pulse (accessible focus animation)
+- Improved scrollbar: Smaller default (5px→8px on hover+dark mode), rounded thumb with oklch colors
+- Focus ring pulse: `.focus-ring-pulse:focus-visible` class for accessible animated focus rings
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- agent-browser QA (all verified):
+  - Dashboard: loads with sidebar "Inbox 7" badge, section groupings ✅
+  - Chatbot: loads with "Knowledge 3" and "FAQs 4" tab badges ✅
+  - Widget Demo: loads with customization panel, color presets, copy snippet ✅
+  - Settings: loads with 7 tabs, role badges ✅
+- Dev server: port 3000 running
+- Zero console errors or runtime errors
+
+## Unresolved Issues / Risks
+1. **Dev server stability**: Sandbox kills idle processes. Auto-restarts. Low impact.
+2. **Role persistence**: Role changes are saved to the database but the session token doesn't update until next login — the current user's role display in the sidebar may be stale after a role change.
+3. **Widget demo customization**: Changes are client-side only (no persistence) — they reset on page reload. This is intentional for demo purposes.
+4. **QR code in embed tab**: Currently a placeholder SVG. A real QR code library could be added for production.
+
+## Priority Recommendations for Next Phase
+1. **Real-time Socket.io wiring**: Wire `join:org` in the inbox for true cross-conversation live updates (eliminate 10-10s polling fallback).
+2. **Onboarding wizard**: Multi-step setup wizard (create bot → upload KB → customize → embed) replacing current modal, with progress tracking.
+3. **Conversation notes**: Allow agents to add internal notes to conversations (visible only to team, not to visitors).
+4. **Webhook delivery logs**: Track webhook delivery attempts, retries, and failures in a new model.
+5. **Keyboard shortcuts enhancement**: Expand ⌘K command palette with more actions (assign, tag, close, export).
+6. **Mobile responsive improvements**: Test and fix any mobile layout issues across all pages.
+7. **Performance optimization**: Lazy load charts, debounce API calls, add loading skeletons everywhere.

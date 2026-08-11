@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
+import { db } from "@/lib/db";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
@@ -13,9 +14,27 @@ export default async function DashboardLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  // Get count of active HUMAN conversations for the sidebar badge
+  let activeConvCount = 0;
+  try {
+    const bot = await db.chatbot.findFirst({ where: { orgId: user.orgId } });
+    if (bot) {
+      activeConvCount = await db.conversation.count({
+        where: { chatbotId: bot.id, status: "HUMAN" },
+      });
+    }
+  } catch {
+    // Silently fail
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar orgName={user.orgName} userName={user.name} />
+      <Sidebar
+        orgName={user.orgName}
+        userName={user.name}
+        userRole={user.role}
+        activeConvCount={activeConvCount}
+      />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar userName={user.name} orgName={user.orgName} />
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>

@@ -34,7 +34,7 @@ export async function GET() {
     return NextResponse.json({ error: "Org not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ org });
+  return NextResponse.json({ org, currentUserId: user.id, currentUserRole: user.role });
 }
 
 // PATCH /api/settings — update org name
