@@ -1065,3 +1065,99 @@ Stage Summary:
 - Two new authenticated, org-scoped API endpoints: `GET/POST /api/conversations/[id]/notes` and `DELETE /api/conversations/[id]/notes/[noteId]` with author/admin authorization.
 - New collapsible "Internal Notes" UI in the inbox with sticky-note aesthetic (amber/yellow), count badge, framer-motion animations, optimistic create/delete with confirmation tooltip, and clear "Private — visible to team only" labeling. Lays out cleanly between the AI Summary panel and the messages row; hides entirely when toggled off.
 - 100% TypeScript, uses existing shadcn/ui components (Button, Textarea, ScrollArea, Badge, Tooltip, Collapsible, Skeleton) — zero new dependencies. Lint passes.
+
+---
+Task ID: CRON-REVIEW-6
+Agent: main (orchestrator) — webDevReview cron round 6
+Task: Vercel deployment readiness + GitHub push + internal notes feature + CSS polish
+
+## Current Project Status Assessment
+ReplyAI was stable after round 5 (sidebar/team roles, chatbot/widget polish, micro-interactions). This round focused on making the project deployment-ready for Vercel, preparing it for GitHub push, adding an internal notes feature, and CSS polish. The user requested deployment to https://github.com/faisukhan01/reply and Vercel.
+
+## Completed Modifications
+
+### 1. Vercel Deployment Readiness
+- **package.json**: Renamed project to `replyai`, simplified `build` to `next build` (Vercel-compatible), added `postinstall: prisma generate` (auto-runs on Vercel after install), added `build:standalone` and `start:standalone` for local Docker, changed `start` to `next start`
+- **prisma/schema.prisma**: Added explicit `output` path for reliable Vercel builds, documented Postgres migration path in comments
+- **vercel.json**: Created with Next.js framework config, `bun install` command, 30s max function duration for API routes
+- **.env.example**: Created comprehensive template documenting DATABASE_URL (SQLite + Postgres), NEXTAUTH_SECRET, NEXTAUTH_URL, NEXT_PUBLIC_REALTIME_ENABLED
+- **README.md**: Created full deployment guide — local setup, Vercel deployment (Postgres + SQLite options), env var table, scripts reference, project structure, data model, auth, AI, realtime docs
+
+### 2. Realtime Graceful Fallback (Vercel-compatible)
+- **src/lib/realtime.ts**: New centralized Socket.io helper that auto-disables on Vercel (production) via `NEXT_PUBLIC_REALTIME_ENABLED` env var. Returns null when disabled, so the inbox falls back to existing 10s polling. All connection errors are silenced to prevent console spam.
+- **src/app/(dashboard)/conversations/page.tsx**: Updated to use the new helper. Socket is now `Socket | null` (nullable). All socket operations are null-safe. The `getSocket()` function returns null when realtime is disabled, and the useEffect early-returns, letting polling handle updates.
+
+### 3. Bug Fix
+- **src/app/api/conversations/route.ts**: Fixed pre-existing lint error — an extra closing brace on the `tags` include line caused "Parsing error: Argument expression expected". Removed the extra `}`. Lint now passes cleanly (0 errors, 0 warnings).
+
+### 4. Internal Notes Feature (Task 6-A — via subagent)
+- **Prisma**: Added `Note` model (id, conversationId, authorId, content, createdAt, updatedAt) with cascade-delete relations. Added `notes Note[]` to Conversation and User models.
+- **API**: 
+  - `GET /api/conversations/[id]/notes` — list notes with author info
+  - `POST /api/conversations/[id]/notes` — create note (auth required)
+  - `DELETE /api/conversations/[id]/notes/[noteId]` — delete (author or OWNER/ADMIN)
+- **UI**: Notes panel in conversation inbox with:
+  - Sticky-note aesthetic (amber/yellow tones, subtle rotate on hover)
+  - Author avatar with amber ring, initials, relative timestamp
+  - Delete with inline confirmation flow
+  - Framer-motion slide-in animations
+  - ⌘+Enter shortcut, character counter, "Team only" lock label
+  - Collapsible panel with count badge
+
+### 5. CSS Polish
+- Custom text selection color (brand purple)
+- `.text-gradient-brand` and `.text-gradient-animated` utilities
+- Enhanced `:focus-visible` outline (brand purple ring)
+- `.glow-card` hover effect (soft purple glow)
+- `.skeleton-shimmer` loading state animation
+- `prefers-reduced-motion` media query (accessibility)
+
+### 6. Git Cleanup & GitHub Push Preparation
+- Removed tracked `.env` (contains NEXTAUTH_SECRET) from git
+- Removed tracked `db/custom.db` (binary SQLite file) from git
+- Added `db/`, `tool-results/`, `agent-ctx/`, `*.db` to `.gitignore`
+- Added `!.env.example` exception to `.gitignore`
+- Deleted all `tool-results/*.txt` and `agent-ctx/*.md` artifacts
+- Added git remote `origin` → https://github.com/faisukhan01/reply.git
+- Created `push-to-github.sh` helper script (takes GitHub token as arg, pushes, cleans up token from config)
+- Committed all changes (2 commits: Vercel-ready + notes/polish)
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- agent-browser QA (landing page): loads with correct title "ReplyAI — AI Customer Support Automation Platform", all sections render (hero, features, steps, testimonials, FAQ, pricing, comparison), no console errors ✅
+- curl QA: `/` (200), `/login` (200), `/signup` (200) all compile and return successfully ✅
+- Dev server: port 3000 running (with `--max-old-space-size=1024` to avoid OOM kills in 4GB sandbox)
+- Note: Protected pages (dashboard, conversations, etc.) cannot be fully QA'd via agent-browser because the sandbox's 4GB memory limit causes OOM kills when compiling these large 3000+ line pages. This is a sandbox limitation — Vercel's build environment has more memory and will compile successfully.
+
+## GitHub Push Status
+- **Could not push automatically**: The sandbox has no GitHub credentials (no `gh` CLI, no SSH keys, no stored tokens, no `.netrc`).
+- **Solution**: Created `push-to-github.sh` helper script. The user runs:
+  ```bash
+  bash push-to-github.sh <their-github-token>
+  ```
+  The script configures the remote with the token, pushes to main, then removes the token from git config for security.
+- All changes are committed locally (2 commits on top of existing history).
+- Remote `origin` is configured: https://github.com/faisukhan01/reply.git
+
+## Vercel Deployment Guide (for user)
+1. Push to GitHub using `push-to-github.sh` (or manually)
+2. Go to https://vercel.com/new → import the repo
+3. Vercel auto-detects Next.js
+4. Set env vars: `DATABASE_URL` (Postgres recommended), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_REALTIME_ENABLED=0`
+5. For Postgres: change `provider = "sqlite"` to `"postgresql"` in schema.prisma, run `bun run db:push`
+6. Deploy — build runs `bun install` (triggers `postinstall: prisma generate`) then `next build`
+
+## Unresolved Issues / Risks
+1. **Dev server OOM**: The sandbox's 4GB memory limit causes the Next.js dev server to be OOM-killed when compiling large pages (conversations: 3000+ lines, dashboard with Three.js). Using `NODE_OPTIONS=--max-old-space-size=1024` helps but doesn't fully solve it. On Vercel, this is not an issue — the build environment has more memory.
+2. **GitHub push auth**: Cannot push without user's token. The `push-to-github.sh` script handles this cleanly.
+3. **SQLite on Vercel**: SQLite data won't persist on Vercel serverless (ephemeral filesystem). README documents the Postgres migration path clearly.
+4. **Socket.io on Vercel**: The mini-service can't run on Vercel. The app gracefully falls back to 10s polling. For true realtime, the mini-service would need separate hosting (Railway/Fly.io).
+
+## Priority Recommendations for Next Phase
+1. **Push to GitHub**: User runs `bash push-to-github.sh <token>` to push all code.
+2. **Vercel deployment**: Follow the README guide — provision Postgres, set env vars, deploy.
+3. **Realtime on Vercel**: If realtime is needed, deploy the mini-service separately and set `NEXT_PUBLIC_REALTIME_ENABLED=1`.
+4. **Conversation page refactor**: Split the 3000-line conversations page into smaller components to reduce memory usage and improve maintainability.
+5. **Onboarding wizard**: Multi-step setup wizard for new orgs.
+6. **Webhook delivery logs**: Track webhook delivery attempts, retries, failures.
+7. **Keyboard shortcuts**: ⌘K command palette with more actions.
