@@ -5,7 +5,10 @@ import { db } from "@/lib/db";
 async function getOwnedConversation(id: string, orgId: string) {
   const conv = await db.conversation.findUnique({
     where: { id },
-    include: { chatbot: { select: { orgId: true, name: true, id: true } } },
+    include: {
+      chatbot: { select: { orgId: true, name: true, id: true } },
+      tags: { include: { tag: true } },
+    },
   });
   if (!conv || conv.chatbot.orgId !== orgId) return null;
   return conv;
@@ -79,6 +82,14 @@ export async function GET(
         totalMessages: visitorMessages,
         firstSeen: conv.createdAt,
       },
+      tags: conv.tags
+        .map((l) => ({
+          id: l.tag.id,
+          name: l.tag.name,
+          color: l.tag.color,
+          assignedAt: l.assignedAt,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     },
     messages,
   });
@@ -145,9 +156,34 @@ export async function PATCH(
   const updated = await db.conversation.update({
     where: { id },
     data,
+    include: {
+      tags: { include: { tag: true } },
+    },
   });
 
-  return NextResponse.json({ conversation: updated });
+  return NextResponse.json({
+    conversation: {
+      id: updated.id,
+      visitorId: updated.visitorId,
+      visitorName: updated.visitorName,
+      visitorEmail: updated.visitorEmail,
+      status: updated.status,
+      satisfaction: updated.satisfaction,
+      assignedToId: updated.assignedToId,
+      channel: updated.channel,
+      summary: updated.summary,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+      tags: updated.tags
+        .map((l) => ({
+          id: l.tag.id,
+          name: l.tag.name,
+          color: l.tag.color,
+          assignedAt: l.assignedAt,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    },
+  });
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   Copy,
   ExternalLink,
   TestTube,
+  RefreshCw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,23 @@ type OrgInfo = {
   createdAt: string;
 };
 
+type Webhook = {
+  id: string;
+  url: string;
+  events: string[];
+  secret: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const WEBHOOK_EVENTS: { id: string; label: string }[] = [
+  { id: "conversation.created", label: "Conversation created" },
+  { id: "conversation.closed", label: "Conversation closed" },
+  { id: "message.received", label: "Message received" },
+  { id: "satisfaction.rated", label: "Satisfaction rated" },
+];
+
 const planBadge: Record<string, { label: string; className: string }> = {
   FREE: {
     label: "Free",
@@ -159,6 +177,21 @@ export default function SettingsPage() {
     lowSatisfaction: false,
     weeklyReport: true,
   });
+
+  // webhooks
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [webhooksLoading, setWebhooksLoading] = useState(true);
+  const [whDialogOpen, setWhDialogOpen] = useState(false);
+  const [creatingWh, setCreatingWh] = useState(false);
+  const [whForm, setWhForm] = useState<{ url: string; events: string[]; secret: string }>({
+    url: "",
+    events: ["conversation.created"],
+    secret: "",
+  });
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [copiedSecret, setCopiedSecret] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -237,6 +270,166 @@ export default function SettingsPage() {
       toast.error(msg);
     } finally {
       setInviting(false);
+    }
+  }
+
+  const fetchWebhooks = useCallback(async () => {
+    setWebhooksLoading(true);
+    try {
+      const res = await fetch("/api/webhooks", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load webhooks");
+      const data = await res.json();
+      setWebhooks(Array.isArray(data.webhooks) ? (data.webhooks as Webhook[]) : []);
+    } catch {
+      toast.error("Could not load webhooks");
+    } finally {
+      setWebhooksLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWebhooks();
+  }, [fetchWebhooks]);
+
+  function toggleWhEvent(evt: string) {
+    setWhForm((f) => ({
+      ...f,
+      events: f.events.includes(evt)
+        ? f.events.filter((x) => x !== evt)
+        : [...f.events, evt],
+    }));
+  }
+
+  function generateWhSecret() {
+    setWhForm((f) => ({
+      ...f,
+      secret: `whsec_${Math.random().toString(36).slice(2, 12)}${Math.random().toString(36).slice(2, 12)}`,
+    }));
+  }
+
+  async function copyWhSecret(secret: string) {
+    try {
+      await navigator.clipboard.writeText(secret);
+      setCopiedSecret(true);
+      toast.success("Secret copied");
+      setTimeout(() => setCopiedSecret(false), 1500);
+    } catch {
+      toast.error("Could not copy secret");
+    }
+  }
+
+  async function handleCreateWebhook(e: React.FormEvent) {
+    e.preventDefault();
+    const url = whForm.url.trim();
+    if (!url) {
+      toast.error("URL is required");
+      return;
+    }
+    try {
+      new URL(url);
+    } catch {
+      toast.error("Enter a valid http(s) URL");
+      return;
+    }
+    if (whForm.events.length === 0) {
+      toast.error("Select at least one event");
+      return;
+    }
+    setCreatingWh(true);
+    try {
+      const res = await fetch("/api/webhooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          events: whForm.events,
+          secret: whForm.secret || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        throw new Error(j?.error || "Failed to create webhook");
+      }
+      const { webhook } = await res.json();
+      setWebhooks((prev) => [webhook as Webhook, ...prev]);
+      toast.success("Webhook created");
+      setWhForm({ url: "", events: ["conversation.created"], secret: "" });
+      setWhDialogOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create webhook";
+      toast.error(msg);
+    } finally {
+      setCreatingWh(false);
+    }
+  }
+
+  async function handleToggleWebhook(wh: Webhook, next: boolean) {
+    setTogglingId(wh.id);
+    setWebhooks((prev) =>
+      prev.map((w) => (w.id === wh.id ? { ...w, active: next } : w))
+    );
+    try {
+      const res = await fetch(`/api/webhooks/${wh.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        throw new Error(j?.error || "Failed to update webhook");
+      }
+      const { webhook } = await res.json();
+      setWebhooks((prev) =>
+        prev.map((w) => (w.id === wh.id ? (webhook as Webhook) : w))
+      );
+      toast.success(next ? "Webhook enabled" : "Webhook disabled");
+    } catch (err: unknown) {
+      setWebhooks((prev) =>
+        prev.map((w) => (w.id === wh.id ? { ...w, active: !next } : w))
+      );
+      const msg = err instanceof Error ? err.message : "Failed to update webhook";
+      toast.error(msg);
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleDeleteWebhook(wh: Webhook) {
+    setDeletingId(wh.id);
+    try {
+      const res = await fetch(`/api/webhooks/${wh.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        throw new Error(j?.error || "Failed to delete webhook");
+      }
+      setWebhooks((prev) => prev.filter((w) => w.id !== wh.id));
+      toast.success("Webhook deleted");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete webhook";
+      toast.error(msg);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleTestWebhook(wh: Webhook) {
+    setTestingId(wh.id);
+    toast.info(`Sending test to ${wh.url}…`);
+    try {
+      const res = await fetch(`/api/webhooks/${wh.id}/test`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        toast.success(`Test delivered (HTTP ${data.status ?? "ok"})`);
+      } else {
+        toast.error(data?.error || "Test failed");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Test failed";
+      toast.error(msg);
+    } finally {
+      setTestingId(null);
     }
   }
 
@@ -887,7 +1080,15 @@ export default function SettingsPage() {
                       Get notified when events happen in your account.
                     </p>
                   </div>
-                  <Dialog>
+                  <Dialog
+                    open={whDialogOpen}
+                    onOpenChange={(open) => {
+                      setWhDialogOpen(open);
+                      if (!open) {
+                        setWhForm({ url: "", events: ["conversation.created"], secret: "" });
+                      }
+                    }}
+                  >
                     <DialogTrigger asChild>
                       <Button size="sm" className="gap-1.5">
                         <Plus className="h-3.5 w-3.5" />
@@ -901,23 +1102,39 @@ export default function SettingsPage() {
                           Enter the URL where you want to receive event payloads.
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 py-2">
+                      <form onSubmit={handleCreateWebhook} className="space-y-4 py-2">
                         <div className="space-y-2">
-                          <Label htmlFor="wh-url">Payload URL</Label>
-                          <Input id="wh-url" placeholder="https://your-app.com/api/webhook" />
+                          <Label htmlFor="wh-url">
+                            Payload URL <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="wh-url"
+                            placeholder="https://your-app.com/api/webhook"
+                            value={whForm.url}
+                            onChange={(e) =>
+                              setWhForm((f) => ({ ...f, url: e.target.value }))
+                            }
+                            autoFocus
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label>Events</Label>
                           <div className="space-y-2">
-                            {[
-                              { id: "conv_created", label: "Conversation created" },
-                              { id: "conv_closed", label: "Conversation closed" },
-                              { id: "msg_received", label: "Message received" },
-                              { id: "sat_rated", label: "Satisfaction rated" },
-                            ].map((evt) => (
-                              <label key={evt.id} className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" className="rounded" defaultChecked={evt.id === "conv_created"} />
-                                {evt.label}
+                            {WEBHOOK_EVENTS.map((evt) => (
+                              <label
+                                key={evt.id}
+                                className="flex items-center gap-2 text-sm cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-input"
+                                  checked={whForm.events.includes(evt.id)}
+                                  onChange={() => toggleWhEvent(evt.id)}
+                                />
+                                <span>{evt.label}</span>
+                                <code className="text-[10px] font-mono text-muted-foreground">
+                                  {evt.id}
+                                </code>
                               </label>
                             ))}
                           </div>
@@ -925,77 +1142,194 @@ export default function SettingsPage() {
                         <div className="space-y-2">
                           <Label>Signing secret</Label>
                           <div className="flex items-center gap-2">
-                            <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md font-mono">
-                              whsec_{Math.random().toString(36).slice(2, 14)}...
+                            <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md font-mono truncate">
+                              {whForm.secret || "auto-generated on create"}
                             </code>
-                            <Button variant="outline" size="sm" className="gap-1">
-                              <Copy className="h-3 w-3" />
-                              Copy
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={generateWhSecret}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Generate
                             </Button>
+                            {whForm.secret && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => copyWhSecret(whForm.secret)}
+                              >
+                                {copiedSecret ? (
+                                  <Check className="h-3 w-3" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                                {copiedSecret ? "Copied" : "Copy"}
+                              </Button>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Use this secret to verify webhook signatures on your server.
+                            Use this secret to verify the{" "}
+                            <code className="font-mono">X-ReplyAI-Signature</code>{" "}
+                            header on incoming webhook requests. Leave blank to
+                            auto-generate.
                           </p>
                         </div>
-                      </div>
-                      <DialogFooter>
-                        <Button>Create webhook</Button>
-                      </DialogFooter>
+                        <DialogFooter>
+                          <Button
+                            type="submit"
+                            disabled={creatingWh}
+                            className="gap-1.5"
+                          >
+                            {creatingWh && (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            )}
+                            {creatingWh ? "Creating…" : "Create webhook"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
                     </DialogContent>
                   </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {/* Demo webhooks */}
-                    {[
-                      { url: "https://api.myapp.com/webhooks/replyai", events: ["Conversation created", "Message received"], active: true, created: "2 days ago" },
-                      { url: "https://slack-bot.myapp.com/notify", events: ["Satisfaction rated"], active: false, created: "1 week ago" },
-                    ].map((wh, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg border p-4 gap-4 hover:bg-muted/30 transition-colors">
-                        <div className="min-w-0 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <code className="text-sm font-mono truncate">{wh.url}</code>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
+                  {webhooksLoading ? (
+                    <div className="space-y-3">
+                      {[0, 1].map((i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between rounded-lg border p-4 gap-4"
+                        >
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-4 w-2/3" />
+                            <Skeleton className="h-3 w-1/3" />
                           </div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {wh.events.map((e) => (
-                              <Badge key={e} variant="secondary" className="text-[10px] gap-1">
-                                <Zap className="h-2.5 w-2.5" />
-                                {e}
-                              </Badge>
-                            ))}
-                            <span className="text-[11px] text-muted-foreground">· {wh.created}</span>
-                          </div>
+                          <Skeleton className="h-8 w-16" />
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Switch defaultChecked={wh.active} />
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete webhook?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will stop sending events to {wh.url}. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                      ))}
+                    </div>
+                  ) : webhooks.length === 0 ? (
+                    <div className="text-center py-12 px-4">
+                      <div className="mx-auto h-12 w-12 rounded-full bg-violet-100 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-300">
+                        <Webhook className="h-6 w-6" />
                       </div>
-                    ))}
-                  </div>
+                      <p className="mt-4 text-sm font-medium">No webhooks yet</p>
+                      <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                        Add a webhook to receive real-time event notifications
+                        when conversations start, close, or receive messages.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="mt-4 gap-1.5"
+                        onClick={() => setWhDialogOpen(true)}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add your first webhook
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {webhooks.map((wh) => (
+                        <div
+                          key={wh.id}
+                          className="flex items-center justify-between rounded-lg border p-4 gap-4 hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="min-w-0 space-y-1.5 flex-1">
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm font-mono truncate">
+                                {wh.url}
+                              </code>
+                              <a
+                                href={wh.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-muted-foreground hover:text-foreground"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {wh.events.map((e) => (
+                                <Badge
+                                  key={e}
+                                  variant="secondary"
+                                  className="text-[10px] gap-1"
+                                >
+                                  <Zap className="h-2.5 w-2.5" />
+                                  {e}
+                                </Badge>
+                              ))}
+                              <span className="text-[11px] text-muted-foreground">
+                                · {formatDate(wh.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-xs"
+                              disabled={testingId === wh.id}
+                              onClick={() => handleTestWebhook(wh)}
+                            >
+                              {testingId === wh.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <TestTube className="h-3.5 w-3.5" />
+                              )}
+                              <span className="hidden sm:inline">Test</span>
+                            </Button>
+                            <Switch
+                              checked={wh.active}
+                              disabled={togglingId === wh.id}
+                              onCheckedChange={(next) =>
+                                handleToggleWebhook(wh, next)
+                              }
+                            />
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  disabled={deletingId === wh.id}
+                                >
+                                  {deletingId === wh.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Delete webhook?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will stop sending events to {wh.url}.
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleDeleteWebhook(wh)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1004,28 +1338,33 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="text-base">Test a webhook</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Send a sample payload to verify your endpoint is receiving events correctly.
+                    Use the{" "}
+                    <span className="font-medium text-foreground">Test</span>{" "}
+                    button next to a webhook above to send a sample payload and
+                    verify your endpoint is receiving events.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Input placeholder="Select a webhook URL" className="flex-1" />
-                    <Button variant="outline" className="gap-1.5">
-                      <TestTube className="h-3.5 w-3.5" />
-                      Send test
-                    </Button>
-                  </div>
                   <div className="rounded-lg bg-muted/50 p-3">
                     <code className="text-xs font-mono text-muted-foreground block whitespace-pre">{`{
   "event": "conversation.created",
   "data": {
-    "id": "conv_abc123",
-    "visitorName": "John Doe",
+    "id": "conv_test_0001",
+    "visitorName": "Test Visitor",
+    "channel": "WIDGET",
     "createdAt": "2024-08-11T10:30:00Z"
   },
   "timestamp": "2024-08-11T10:30:00Z"
 }`}</code>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    The request includes an{" "}
+                    <code className="font-mono">X-ReplyAI-Signature</code> header
+                    (HMAC-SHA256 of the body using your webhook&apos;s signing
+                    secret) and an{" "}
+                    <code className="font-mono">X-ReplyAI-Event</code> header
+                    with the event name.
+                  </p>
                 </CardContent>
               </Card>
             </div>

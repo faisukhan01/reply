@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+     4→import { io, type Socket } from "socket.io-client";
+     5→import { formatDistanceToNow, format, subDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+     6→import { motion, AnimatePresence } from "framer-motion";
+     7→import { type DateRange } from "react-day-picker";
+     8→import {
+     9→  Search,
+    10→  Send,
+    11→  Bot,
+    12→  User as UserIcon,
+    13→  MessageSquare,
+    14→  MoreVertical,
+    15→  Check,
+    16→  X,
+    17→  Clock,
+    18→  Headphones,
+    19→  Circle,
+    20→  ArrowLeft,
+    21→  Users,
+    22→  Sparkles,
+    23→  FileText,
+    24→  Wand2,
+    25→  Zap,
+    26→  ChevronDown,
+    27→  Star,
+    28→  Download,
+    29→  Inbox,
+    30→  AlertTriangle,
+    31→  UserCheck,
+    32→  SquareCheck,
+    33→  Square,
+    34→  Calendar,
+    35→  Filter,
+    36→  Trash2,
+    37→  Eye,
+    38→  CheckSquare,
+    39→  Globe,
+    40→  Code,
+    41→  Command,
+    42→} from "lucide-react";
+    43→
+    44→import { cn } from "@/lib/utils";
+    45→import { Button } from "@/components/ui/button";
+    46→import { Input } from "@/components/ui/input";
+    47→import { Textarea } from "@/components/ui/textarea";
+    48→import { Badge } from "@/components/ui/badge";
+    49→import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+    50→import { Skeleton } from "@/components/ui/skeleton";
+    51→import { Separator } from "@/components/ui/separator";
+    52→import { Checkbox } from "@/components/ui/checkbox";
+    53→import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+    54→import {
+    55→  Popover,
+    56→  PopoverContent,
+    57→  PopoverTrigger,
+    58→} from "@/components/ui/popover";
+    59→import {
+    60→  AlertDialog,
+    61→  AlertDialogAction,
+    62→  AlertDialogCancel,
+    63→  AlertDialogContent,
+    64→  AlertDialogDescription,
+    65→  AlertDialogFooter,
+    66→  AlertDialogHeader,
+    67→  AlertDialogTitle,
+    68→} from "@/components/ui/alert-dialog";
+    69→import {
+    70→  Tooltip,
+    71→  TooltipContent,
+    72→  TooltipProvider,
+    73→  TooltipTrigger,
+    74→} from "@/components/ui/tooltip";
+    75→import {
+    76→  DropdownMenu,
+    77→  DropdownMenuContent,
+    78→  DropdownMenuCheckboxItem,
+    79→  DropdownMenuItem,
+    80→  DropdownMenuLabel,
+    81→  DropdownMenuSeparator,
+    82→  DropdownMenuTrigger,
+    83→} from "@/components/ui/dropdown-menu";
+    84→import {
+    85→  Sheet,
+    86→  SheetContent,
+    87→  SheetHeader,
+    88→  SheetTitle,
+    89→} from "@/components/ui/sheet";
+    90→
+    91→// ─── Types ────────────────────────────────────────────────────────
+    92→type ConvStatus = "AI" | "HUMAN" | "CLOSED";
+    93→
+    94→type LastMessage = {
+    95→  content: string;
+    96→  role: "VISITOR" | "AI" | "AGENT";
+    97→  createdAt: string;
+    98→};
+    99→
+   100→type ConversationListItem = {
+   101→  id: string;
+   102→  visitorName: string | null;
+   103→  visitorEmail: string | null;
+   104→  visitorId: string;
+   105→  status: ConvStatus;
+   106→  channel: string;
+   107→  satisfaction: number | null;
+   108→  assignedToId: string | null;
+   109→  createdAt: string;
+   110→  updatedAt: string;
+   111→  lastMessage: LastMessage | null;
+   112→  messageCount: number;
+   113→};
+   114→
+   115→type Message = {
+   116→  id: string;
+   117→  conversationId: string;
+   118→  role: "VISITOR" | "AI" | "AGENT";
+   119→  content: string;
+   120→  createdAt: string;
+   121→};
+   122→
+   123→type ConversationDetail = {
+   124→  id: string;
+   125→  visitorId: string;
+   126→  visitorName: string | null;
+   127→  visitorEmail: string | null;
+   128→  status: ConvStatus;
+   129→  satisfaction: number | null;
+   130→  assignedToId: string | null;
+   131→  assignedAgent: { id: string; name: string; email: string } | null;
+   132→  channel: string;
+   133→  summary: string | null;
+   134→  createdAt: string;
+   135→  updatedAt: string;
+   136→  chatbot: { id: string; name: string };
+   137→  visitor: {
+   138→    totalConversations: number;
+   139→    totalMessages: number;
+   140→    firstSeen: string;
+   141→  };
+   142→};
+   143→
+   144→// ─── Helpers ──────────────────────────────────────────────────────
+   145→const AVATAR_COLORS = [
+   146→  "bg-rose-500",
+   147→  "bg-orange-500",
+   148→  "bg-amber-500",
+   149→  "bg-emerald-500",
+   150→  "bg-teal-500",
+   151→  "bg-cyan-500",
+   152→  "bg-violet-500",
+   153→  "bg-fuchsia-500",
+   154→  "bg-pink-500",
+   155→  "bg-purple-500",
+   156→];
+   157→
+   158→function hashString(s: string): number {
+   159→  let h = 0;
+   160→  for (let i = 0; i < s.length; i++) {
+   161→    h = (h << 5) - h + s.charCodeAt(i);
+   162→    h |= 0;
+   163→  }
+   164→  return Math.abs(h);
+   165→}
+   166→
+   167→function avatarColor(name: string): string {
+   168→  return AVATAR_COLORS[hashString(name) % AVATAR_COLORS.length];
+   169→}
+   170→
+   171→function initials(name: string | null): string {
+   172→  if (!name) return "?";
+   173→  const parts = name.trim().split(/\s+/).filter(Boolean);
+   174→  if (parts.length === 0) return "?";
+   175→  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+   176→  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+   177→}
+   178→
+   179→function statusBadgeClass(status: ConvStatus): string {
+   180→  switch (status) {
+   181→    case "AI":
+   182→      return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 border-violet-200 dark:border-violet-500/20";
+   183→    case "HUMAN":
+   184→      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/20";
+   185→    case "CLOSED":
+   186→    default:
+   187→      return "bg-muted text-muted-foreground border-border";
+   188→  }
+   189→}
+   190→
+   191→function statusLabel(status: ConvStatus): string {
+   192→  switch (status) {
+   193→    case "AI":
+   194→      return "AI";
+   195→    case "HUMAN":
+   196→      return "Human";
+   197→    case "CLOSED":
+   198→      return "Closed";
+   199→  }
+   200→}
+   201→
+   202→function timeAgo(iso: string): string {
+   203→  try {
+   204→    return formatDistanceToNow(new Date(iso), { addSuffix: true });
+   205→  } catch {
+   206→    return "";
+   207→  }
+   208→}
+   209→
+   210→function msgTime(iso: string): string {
+   211→  try {
+   212→    return format(new Date(iso), "p");
+   213→  } catch {
+   214→    return "";
+   215→  }
+   216→}
+   217→
+   218→// ─── Realtime socket singleton ────────────────────────────────────
+   219→let socketSingleton: Socket | null = null;
+   220→function getSocket(): Socket {
+   221→  if (socketSingleton) return socketSingleton;
+   222→  socketSingleton = io("/?XTransformPort=3001", {
+   223→    transports: ["websocket", "polling"],
+   224→    reconnection: true,
+   225→    reconnectionAttempts: Infinity,
+   226→    reconnectionDelay: 1000,
+   227→    timeout: 10000,
+   228→  });
+   229→  return socketSingleton;
+   230→}
+   231→
+   232→// ─── Component ────────────────────────────────────────────────────
+   233→type Tab = "ALL" | "AI" | "HUMAN" | "CLOSED" | "NEEDS_ATTENTION";
+   234→
+   235→export default function ConversationsPage() {
+   236→  // List state
+   237→  const [conversations, setConversations] = useState<ConversationListItem[]>(
+   238→    []
+   239→  );
+   240→  const [loadingList, setLoadingList] = useState(true);
+   241→  const [search, setSearch] = useState("");
+   242→  const [tab, setTab] = useState<Tab>("ALL");
+   243→
+   244→  // Selected conversation
+   245→  const [selectedId, setSelectedId] = useState<string | null>(null);
+   246→  const [detail, setDetail] = useState<ConversationDetail | null>(null);
+   247→  const [messages, setMessages] = useState<Message[]>([]);
+   248→  const [loadingDetail, setLoadingDetail] = useState(false);
+   249→
+   250→  // Composer
+   251→  const [draft, setDraft] = useState("");
+   252→  const [sending, setSending] = useState(false);
+   253→
+   254→  // Mobile view toggle
+   255→  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+   256→
+   257→  // Typing indicator (AI)
+   258→  const [aiTyping, setAiTyping] = useState(false);
+   259→  const aiTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+   260→
+   261→  // AI Summary
+   262→  const [summary, setSummary] = useState<string | null>(null);
+   263→  const [loadingSummary, setLoadingSummary] = useState(false);
+   264→  const [showSummary, setShowSummary] = useState(false);
+   265→
+   266→  // AI Reply Suggestions
+   267→  const [suggestions, setSuggestions] = useState<string[]>([]);
+   268→  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+   269→
+   270→  // Canned responses
+   271→  const [canned, setCanned] = useState<
+   272→    { id: string; title: string; content: string; shortcut: string | null }[]
+   273→  >([]);
+   274→  const [cannedOpen, setCannedOpen] = useState(false);
+   275→
+   276→  // Team members (for Assign dropdown)
+   277→  const [members, setMembers] = useState<
+   278→    { id: string; name: string; email: string; role: string }[]
+   279→  >([]);
+   280→
+   281→  // Visitor info panel toggle
+   282→  const [showVisitorPanel, setShowVisitorPanel] = useState(false);
+   283→
+   284→  // Bulk selection
+   285→  const [selectedConvos, setSelectedConvos] = useState<Set<string>>(new Set());
+   286→  const toggleConvoSelect = useCallback((id: string) => {
+   287→    setSelectedConvos((prev) => {
+   288→      const next = new Set(prev);
+   289→      if (next.has(id)) next.delete(id);
+   290→      else next.add(id);
+   291→      return next;
+   292→    });
+   293→  }, []);
+   294→  const clearSelection = useCallback(() => setSelectedConvos(new Set()), []);
+   295→
+   296→  // ─── Enhanced Filters ────────────────────────────────────────────
+   297→  // Date range filter
+   298→  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+   299→  const [datePreset, setDatePreset] = useState<"all" | "7d" | "30d" | "custom">("all");
+   300→
+   301→  // Multi-status filter (replaces single tab for status, but tab still controls needs_attention)
+   302→  const [statusFilters, setStatusFilters] = useState<Set<ConvStatus>>(new Set());
+   303→
+   304→  // Channel filter
+   305→  const [channelFilters, setChannelFilters] = useState<Set<string>>(new Set());
+   306→
+   307→  // Satisfaction filter
+   308→  const [satisfactionFilter, setSatisfactionFilter] = useState<"all" | "rated" | "unrated" | "high" | "low">("all");
+   309→
+   310→  // Bulk delete dialog
+   311→  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+   312→
+   313→  // Search ref for ⌘F shortcut
+   314→  const searchInputRef = useRef<HTMLInputElement | null>(null);
+   315→
+   316→  // Debounced search (300ms)
+   317→  const [debouncedSearch, setDebouncedSearch] = useState("");
+   318→  useEffect(() => {
+   319→    const t = setTimeout(() => setDebouncedSearch(search), 300);
+   320→    return () => clearTimeout(t);
+   321→  }, [search]);
+   322→
+   323→  // Active filter count for badge
+   324→  const activeFilterCount = useMemo(() => {
+   325→    let count = 0;
+   326→    if (datePreset !== "all") count++;
+   327→    if (statusFilters.size > 0) count++;
+   328→    if (channelFilters.size > 0) count++;
+   329→    if (satisfactionFilter !== "all") count++;
+   330→    if (search.trim()) count++;
+   331→    if (tab !== "ALL") count++;
+   332→    return count;
+   333→  }, [datePreset, statusFilters, channelFilters, satisfactionFilter, search, tab]);
+   334→
+   335→  // Socket ref
+   336→  const socketRef = useRef<Socket | null>(null);
+   337→
+   338→  // Unread tracking (conversationId -> count) — simplified: mark unread when a
+   339→  // visitor message arrives for a non-selected conversation.
+   340→  const [unread, setUnread] = useState<Record<string, number>>({});
+   341→
+   342→  // ─── Fetch list ────────────────────────────────────────────────
+   343→  const fetchList = useCallback(async () => {
+   344→    try {
+   345→      const params = new URLSearchParams();
+   346→      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+   347→      const res = await fetch(`/api/conversations?${params.toString()}`, {
+   348→        cache: "no-store",
+   349→      });
+   350→      if (!res.ok) return;
+   351→      const data = await res.json();
+   352→      setConversations(data.conversations ?? []);
+   353→    } catch {
+   354→      // ignore
+   355→    } finally {
+   356→      setLoadingList(false);
+   357→    }
+   358→  }, [debouncedSearch]);
+   359→
+   360→  // Debounce search + refetch
+   361→  useEffect(() => {
+   362→    setLoadingList(true);
+   363→    const t = setTimeout(() => {
+   364→      void fetchList();
+   365→    }, 300);
+   366→    return () => clearTimeout(t);
+   367→  }, [debouncedSearch, fetchList]);
+   368→
+   369→  // Initial load + polling fallback (every 10s)
+   370→  useEffect(() => {
+   371→    void fetchList();
+   372→    const interval = setInterval(() => {
+   373→      void fetchList();
+   374→    }, 10000);
+   375→    return () => clearInterval(interval);
+   376→  }, [fetchList]);
+   377→
+   378→  // ─── Socket setup ──────────────────────────────────────────────
+   379→  useEffect(() => {
+   380→    const socket = getSocket();
+   381→    socketRef.current = socket;
+   382→
+   383→    const onMessageNew = (payload: {
+   384→      conversationId: string;
+   385→      message: Message;
+   386→    }) => {
+   387→      if (!payload?.conversationId || !payload?.message) return;
+   388→      const { conversationId, message } = payload;
+   389→
+   390→      // If this is the selected conversation, append to messages.
+   391→      if (conversationId === selectedId) {
+   392→        setMessages((prev) => {
+   393→          if (prev.some((m) => m.id === message.id)) return prev;
+   394→          return [...prev, message];
+   395→        });
+   396→        // Auto-scroll handled by effect below.
+   397→      }
+   398→
+   399→      // Update list preview + bump updatedAt.
+   400→      setConversations((prev) => {
+   401→        const idx = prev.findIndex((c) => c.id === conversationId);
+   402→        if (idx === -1) {
+   403→          // New conversation — trigger a refetch.
+   404→          void fetchList();
+   405→          return prev;
+   406→        }
+   407→        const updated = [...prev];
+   408→        const conv = { ...updated[idx] };
+   409→        conv.lastMessage = {
+   410→          content: message.content,
+   411→          role: message.role,
+   412→          createdAt: message.createdAt,
+   413→        };
+   414→        conv.updatedAt = message.createdAt;
+   415→        // Move to top.
+   416→        updated.splice(idx, 1);
+   417→        updated.unshift(conv);
+   418→        return updated;
+   419→      });
+   420→
+   421→      // Unread tracking for non-selected conversations when visitor messages.
+   422→      if (
+   423→        conversationId !== selectedId &&
+   424→        (message.role === "VISITOR" || message.role === "AI")
+   425→      ) {
+   426→        setUnread((prev) => ({
+   427→          ...prev,
+   428→          [conversationId]: (prev[conversationId] ?? 0) + 1,
+   429→        }));
+   430→      }
+   431→
+   432→      // If visitor sent a message, show a brief AI typing indicator.
+   433→      if (message.role === "VISITOR" && conversationId === selectedId) {
+   434→        setAiTyping(true);
+   435→        if (aiTypingTimer.current) clearTimeout(aiTypingTimer.current);
+   436→        aiTypingTimer.current = setTimeout(() => setAiTyping(false), 3000);
+   437→      }
+   438→    };
+   439→
+   440→    const onConvUpdate = (payload: {
+   441→      conversationId: string;
+   442→      patch: Partial<ConversationListItem>;
+   443→    }) => {
+   444→      if (!payload?.conversationId) return;
+   445→      setConversations((prev) =>
+   446→        prev.map((c) =>
+   447→          c.id === payload.conversationId
+   448→            ? { ...c, ...payload.patch }
+   449→            : c
+   450→        )
+   451→      );
+   452→      if (payload.conversationId === selectedId && detail) {
+   453→        setDetail((d) => (d ? { ...d, ...payload.patch } : d));
+   454→      }
+   455→    };
+   456→
+   457→    socket.on("message:new", onMessageNew);
+   458→    socket.on("conversation:update", onConvUpdate);
+   459→
+   460→    if (!socket.connected) {
+   461→      socket.connect();
+   462→    }
+   463→
+   464→    return () => {
+   465→      socket.off("message:new", onMessageNew);
+   466→      socket.off("conversation:update", onConvUpdate);
+   467→    };
+   468→  }, [selectedId, detail, fetchList]);
+   469→
+   470→  // ─── Join/leave conversation room on select ────────────────────
+   471→  useEffect(() => {
+   472→    const socket = socketRef.current;
+   473→    if (!socket || !selectedId) return;
+   474→    socket.emit("join:conversation", selectedId);
+   475→    return () => {
+   476→      socket.emit("leave:conversation", selectedId);
+   477→    };
+   478→  }, [selectedId]);
+   479→
+   480→  // ─── Fetch detail on select ────────────────────────────────────
+   481→  useEffect(() => {
+   482→    if (!selectedId) {
+   483→      setDetail(null);
+   484→      setMessages([]);
+   485→      setSummary(null);
+   486→      setSuggestions([]);
+   487→      setShowSummary(false);
+   488→      return;
+   489→    }
+   490→    let cancelled = false;
+   491→    setLoadingDetail(true);
+   492→    setMessages([]);
+   493→    setDetail(null);
+   494→    setSummary(null);
+   495→    setShowSummary(false);
+   496→    setSuggestions([]);
+   497→    (async () => {
+   498→      try {
+   499→        const res = await fetch(`/api/conversations/${selectedId}`, {
+   500→          cache: "no-store",
+   501→        });
+   502→        if (!res.ok) return;
+   503→        const data = await res.json();
+   504→        if (cancelled) return;
+   505→        setDetail(data.conversation);
+   506→        setMessages(data.messages ?? []);
+   507→        if (data.conversation?.summary) {
+   508→          setSummary(data.conversation.summary);
+   509→        }
+   510→        // Clear unread for this conversation.
+   511→        setUnread((prev) => {
+   512→          if (!prev[selectedId]) return prev;
+   513→          const next = { ...prev };
+   514→          delete next[selectedId];
+   515→          return next;
+   516→        });
+   517→      } catch {
+   518→        // ignore
+   519→      } finally {
+   520→        if (!cancelled) setLoadingDetail(false);
+   521→      }
+   522→    })();
+   523→    return () => {
+   524→      cancelled = true;
+   525→    };
+   526→  }, [selectedId]);
+   527→
+   528→  // ─── Auto-scroll to bottom on new messages ─────────────────────
+   529→  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+   530→  useEffect(() => {
+   531→    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+   532→  }, [messages, aiTyping]);
+   533→
+   534→  // ─── Counts per tab ────────────────────────────────────────────
+   535→  const counts = useMemo(() => {
+   536→    const c = { ALL: conversations.length, AI: 0, HUMAN: 0, CLOSED: 0, NEEDS_ATTENTION: 0 };
+   537→    for (const conv of conversations) {
+   538→      if (conv.status === "AI") c.AI++;
+   539→      else if (conv.status === "HUMAN") c.HUMAN++;
+   540→      else if (conv.status === "CLOSED") c.CLOSED++;
+   541→      // Needs attention = HUMAN + unassigned
+   542→      if (conv.status === "HUMAN" && !conv.assignedToId) c.NEEDS_ATTENTION++;
+   543→    }
+   544→    return c;
+   545→  }, [conversations]);
+   546→
+   547→  // Filtered conversations for display — enhanced with all filters
+   548→  const filteredConversations = useMemo(() => {
+   549→    let filtered = conversations;
+   550→
+   551→    // Tab filter (needs attention)
+   552→    if (tab === "NEEDS_ATTENTION") {
+   553→      filtered = filtered.filter((c) => c.status === "HUMAN" && !c.assignedToId);
+   554→    }
+   555→
+   556→    // Multi-status filter
+   557→    if (statusFilters.size > 0 && tab !== "NEEDS_ATTENTION") {
+   558→      filtered = filtered.filter((c) => statusFilters.has(c.status));
+   559→    }
+   560→
+   561→    // Channel filter
+   562→    if (channelFilters.size > 0) {
+   563→      filtered = filtered.filter((c) => channelFilters.has(c.channel));
+   564→    }
+   565→
+   566→    // Satisfaction filter
+   567→    if (satisfactionFilter !== "all") {
+   568→      filtered = filtered.filter((c) => {
+   569→        switch (satisfactionFilter) {
+   570→          case "rated": return c.satisfaction !== null;
+   571→          case "unrated": return c.satisfaction === null;
+   572→          case "high": return c.satisfaction !== null && c.satisfaction >= 4;
+   573→          case "low": return c.satisfaction !== null && c.satisfaction <= 2;
+   574→          default: return true;
+   575→        }
+   576→      });
+   577→    }
+   578→
+   579→    // Date range filter
+   580→    if (datePreset !== "all" && dateRange?.from) {
+   581→      const from = startOfDay(dateRange.from);
+   582→      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+   583→      filtered = filtered.filter((c) => {
+   584→        try {
+   585→          return isWithinInterval(new Date(c.updatedAt), { start: from, end: to });
+   586→        } catch {
+   587→          return false;
+   588→        }
+   589→      });
+   590→    } else if (datePreset === "7d") {
+   591→      const from = subDays(new Date(), 7);
+   592→      filtered = filtered.filter((c) => {
+   593→        try { return new Date(c.updatedAt) >= from; } catch { return false; }
+   594→      });
+   595→    } else if (datePreset === "30d") {
+   596→      const from = subDays(new Date(), 30);
+   597→      filtered = filtered.filter((c) => {
+   598→        try { return new Date(c.updatedAt) >= from; } catch { return false; }
+   599→      });
+   600→    }
+   601→
+   602→    // Client-side search across visitor name, email, and message content
+   603→    if (debouncedSearch.trim()) {
+   604→      const q = debouncedSearch.toLowerCase().trim();
+   605→      filtered = filtered.filter((c) => {
+   606→        const name = (c.visitorName || "").toLowerCase();
+   607→        const email = (c.visitorEmail || "").toLowerCase();
+   608→        const msg = (c.lastMessage?.content || "").toLowerCase();
+   609→        return name.includes(q) || email.includes(q) || msg.includes(q);
+   610→      });
+   611→    }
+   612→
+   613→    return filtered;
+   614→  }, [conversations, tab, statusFilters, channelFilters, satisfactionFilter, datePreset, dateRange, debouncedSearch]);
+   615→
+   616→  // ─── Actions ───────────────────────────────────────────────────
+   617→  const patchConversation = useCallback(
+   618→    async (patch: { status?: ConvStatus; assignedToId?: string | null }) => {
+   619→      if (!selectedId) return;
+   620→      try {
+   621→        const res = await fetch(`/api/conversations/${selectedId}`, {
+   622→          method: "PATCH",
+   623→          headers: { "Content-Type": "application/json" },
+   624→          body: JSON.stringify(patch),
+   625→        });
+   626→        if (!res.ok) return;
+   627→        const data = await res.json();
+   628→        const updated = data.conversation as ConversationDetail;
+   629→        setDetail(updated);
+   630→        setConversations((prev) =>
+   631→          prev.map((c) =>
+   632→            c.id === updated.id
+   633→              ? {
+   634→                  ...c,
+   635→                  status: updated.status,
+   636→                  assignedToId: updated.assignedToId,
+   637→                }
+   638→              : c
+   639→          )
+   640→        );
+   641→        // Broadcast update via socket.
+   642→        socketRef.current?.emit("conversation:update", {
+   643→          conversationId: selectedId,
+   644→          patch: {
+   645→            status: updated.status,
+   646→            assignedToId: updated.assignedToId,
+   647→          },
+   648→        });
+   649→      } catch {
+   650→        // ignore
+   651→      }
+   652→    },
+   653→    [selectedId]
+   654→  );
+   655→
+   656→  const sendMessage = useCallback(async () => {
+   657→    const content = draft.trim();
+   658→    if (!content || !selectedId || sending) return;
+   659→    setSending(true);
+   660→    setDraft("");
+   661→    try {
+   662→      const res = await fetch(`/api/conversations/${selectedId}/messages`, {
+   663→        method: "POST",
+   664→        headers: { "Content-Type": "application/json" },
+   665→        body: JSON.stringify({ content }),
+   666→      });
+   667→      if (!res.ok) return;
+   668→      const data = await res.json();
+   669→      const msg = data.message as Message;
+   670→      // Append locally (in case socket echo doesn't arrive — it shouldn't,
+   671→      // since the realtime service only broadcasts to OTHER clients in the
+   672→      // room, but the sender's own socket will receive it too).
+   673→      setMessages((prev) =>
+   674→        prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+   675→      );
+   676→      // Emit to realtime service so the visitor widget + other inbox tabs
+   677→      // receive it live.
+   678→      socketRef.current?.emit("agent:message", {
+   679→        conversationId: selectedId,
+   680→        message: {
+   681→          id: msg.id,
+   682→          role: msg.role,
+   683→          content: msg.content,
+   684→          createdAt: msg.createdAt,
+   685→        },
+   686→      });
+   687→      // Update list preview.
+   688→      setConversations((prev) => {
+   689→        const idx = prev.findIndex((c) => c.id === selectedId);
+   690→        if (idx === -1) return prev;
+   691→        const updated = [...prev];
+   692→        const conv = { ...updated[idx] };
+   693→        conv.lastMessage = {
+   694→          content: msg.content,
+   695→          role: msg.role,
+   696→          createdAt: msg.createdAt,
+   697→        };
+   698→        conv.updatedAt = msg.createdAt;
+   699→        updated.splice(idx, 1);
+   700→        updated.unshift(conv);
+   701→        return updated;
+   702→      });
+   703→    } catch {
+   704→      // ignore
+   705→    } finally {
+   706→      setSending(false);
+   707→    }
+   708→  }, [draft, selectedId, sending]);
+   709→
+   710→  // ─── AI: Generate conversation summary ──────────────────────────
+   711→  const generateSummary = useCallback(async () => {
+   712→    if (!selectedId || loadingSummary) return;
+   713→    setLoadingSummary(true);
+   714→    setShowSummary(true);
+   715→    try {
+   716→      const res = await fetch(`/api/conversations/${selectedId}/summary`, {
+   717→        method: "POST",
+   718→      });
+   719→      if (!res.ok) return;
+   720→      const data = await res.json();
+   721→      setSummary(data.summary);
+   722→    } catch {
+   723→      /* ignore */
+   724→    } finally {
+   725→      setLoadingSummary(false);
+   726→    }
+   727→  }, [selectedId, loadingSummary]);
+   728→
+   729→  // ─── AI: Generate reply suggestions ─────────────────────────────
+   730→  const loadSuggestions = useCallback(async () => {
+   731→    if (!selectedId || loadingSuggestions) return;
+   732→    setLoadingSuggestions(true);
+   733→    try {
+   734→      const res = await fetch(`/api/conversations/${selectedId}/suggestions`, {
+   735→        method: "POST",
+   736→      });
+   737→      if (!res.ok) return;
+   738→      const data = await res.json();
+   739→      setSuggestions(data.suggestions ?? []);
+   740→    } catch {
+   741→      /* ignore */
+   742→    } finally {
+   743→      setLoadingSuggestions(false);
+   744→    }
+   745→  }, [selectedId, loadingSuggestions]);
+   746→
+   747→  // ─── Canned responses ───────────────────────────────────────────
+   748→  useEffect(() => {
+   749→    (async () => {
+   750→      try {
+   751→        const res = await fetch("/api/canned-responses");
+   752→        if (res.ok) {
+   753→          const data = await res.json();
+   754→          setCanned(data.responses ?? []);
+   755→        }
+   756→      } catch {
+   757→        /* ignore */
+   758→      }
+   759→    })();
+   760→  }, []);
+   761→
+   762→  // ─── Team members (for Assign dropdown) ─────────────────────────
+   763→  useEffect(() => {
+   764→    (async () => {
+   765→      try {
+   766→        const res = await fetch("/api/settings");
+   767→        if (res.ok) {
+   768→          const data = await res.json();
+   769→          setMembers(data.org?.users ?? []);
+   770→        }
+   771→      } catch {
+   772→        /* ignore */
+   773→      }
+   774→    })();
+   775→  }, []);
+   776→
+   777→  // Auto-load suggestions when conversation changes (if there are messages)
+   778→  useEffect(() => {
+   779→    if (selectedId && messages.length > 0 && suggestions.length === 0) {
+   780→      void loadSuggestions();
+   781→    }
+   782→  }, [selectedId, messages.length, suggestions.length, loadSuggestions]);
+   783→
+   784→  const handleSelect = (id: string) => {
+   785→    setSelectedId(id);
+   786→    setMobileView("detail");
+   787→  };
+   788→
+   789→  const handleBack = () => setMobileView("list");
+   790→
+   791→  // ─── ⌘F keyboard shortcut ──────────────────────────────────────
+   792→  useEffect(() => {
+   793→    const handler = (e: KeyboardEvent) => {
+   794→      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+   795→        e.preventDefault();
+   796→        searchInputRef.current?.focus();
+   797→      }
+   798→    };
+   799→    document.addEventListener("keydown", handler);
+   800→    return () => document.removeEventListener("keydown", handler);
+   801→  }, []);
+   802→
+   803→  // ─── Render ────────────────────────────────────────────────────
+   804→  return (
+   805→    <TooltipProvider delayDuration={200}>
+   806→      <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-9rem)] gap-4">
+   807→        {/* Page header */}
+   808→        <div className="flex items-center justify-between gap-4 flex-wrap">
+   809→          <div>
+   810→            <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
+   811→            <p className="text-sm text-muted-foreground">
+   812→              Live conversations across your chatbots.
+   813→            </p>
+   814→          </div>
+   815→          <div className="flex items-center gap-2">
+   816→            <Badge variant="outline" className="gap-1.5">
+   817→              <Circle
+   818→                className={cn(
+   819→                  "size-2 fill-emerald-500 text-emerald-500",
+   820→                  socketRef.current?.connected ? "" : "opacity-30"
+   821→                )}
+   822→              />
+   823→              {socketRef.current?.connected ? "Live" : "Connecting…"}
+   824→            </Badge>
+   825→            <Badge variant="outline" className="gap-1.5">
+   826→              <MessageSquare className="size-3" />
+   827→              {counts.ALL} total
+   828→            </Badge>
+   829→            <Button
+   830→              variant="outline"
+   831→              size="sm"
+   832→              className="gap-1.5"
+   833→              onClick={() => {
+   834→                window.open("/api/conversations/export", "_blank");
+   835→              }}
+   836→            >
+   837→              <Download className="size-3.5" />
+   838→              <span className="hidden sm:inline">Export CSV</span>
+   839→            </Button>
+   840→          </div>
+   841→        </div>
+   842→
+   843→        {/* Split pane */}
+   844→        <div className="flex flex-1 min-h-0 gap-4">
+   845→          {/* ─── Left panel: list ─────────────────────────────── */}
+   846→          <aside
+   847→            className={cn(
+   848→              "flex flex-col w-full md:w-80 lg:w-96 shrink-0 rounded-xl border bg-card overflow-hidden",
+   849→              mobileView === "detail" ? "hidden md:flex" : "flex"
+   850→            )}
+   851→          >
+   852→            {/* Search + ⌘F shortcut */}
+   853→            <div className="p-3 border-b">
+   854→              <div className="relative">
+   855→                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   856→                <Input
+   857→                  ref={searchInputRef}
+   858→                  value={search}
+   859→                  onChange={(e) => setSearch(e.target.value)}
+   860→                  onKeyDown={(e) => { if (e.key === "Escape") { setSearch(""); searchInputRef.current?.blur(); } }}
+   861→                  placeholder="Search name, email, messages…"
+   862→                  className="pl-8 pr-16 bg-background"
+   863→                />
+   864→                <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none inline-flex items-center gap-0.5 rounded border border-muted-foreground/20 bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
+   865→                  <Command className="size-2.5" />F
+   866→                </kbd>
+   867→              </div>
+   868→            </div>
+   869→
+   870→            {/* ⌘F global shortcut */}
+   871→            {/* (handled via effect below) */}
+   872→
+   873→            {/* Filter bar: Tabs + Filter dropdowns */}
+   874→            <div className="px-2 py-2 border-b space-y-2">
+   875→              {/* Tab row */}
+   876→              <div className="flex items-center gap-1 overflow-x-auto scroll-thin">
+   877→                {(
+   878→                  [
+   879→                    { key: "ALL", label: "All", count: counts.ALL },
+   880→                    { key: "AI", label: "AI", count: counts.AI },
+   881→                    { key: "HUMAN", label: "Human", count: counts.HUMAN },
+   882→                    { key: "NEEDS_ATTENTION", label: "Needs attention", count: counts.NEEDS_ATTENTION },
+   883→                    { key: "CLOSED", label: "Closed", count: counts.CLOSED },
+   884→                  ] as { key: Tab; label: string; count: number }[]
+   885→                ).map((t) => (
+   886→                  <button
+   887→                    key={t.key}
+   888→                    onClick={() => {
+   889→                      setTab(t.key);
+   890→                      // When selecting a tab, also set status filter to match (for ALL, clear)
+   891→                      if (t.key === "ALL" || t.key === "NEEDS_ATTENTION") {
+   892→                        setStatusFilters(new Set());
+   893→                      } else {
+   894→                        setStatusFilters(new Set([t.key as ConvStatus]));
+   895→                      }
+   896→                    }}
+   897→                    className={cn(
+   898→                      "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
+   899→                      (tab === t.key || (t.key !== "ALL" && t.key !== "NEEDS_ATTENTION" && statusFilters.has(t.key as ConvStatus) && tab !== "NEEDS_ATTENTION"))
+   900→                        ? "bg-primary text-primary-foreground"
+   901→                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+   902→                    )}
+   903→                  >
+   904→                    {t.key === "NEEDS_ATTENTION" && <AlertTriangle className="size-3" />}
+   905→                    {t.label}
+   906→                    <span
+   907→                      className={cn(
+   908→                        "rounded-full px-1.5 py-0.5 text-[10px] leading-none",
+   909→                        (tab === t.key || (t.key !== "ALL" && t.key !== "NEEDS_ATTENTION" && statusFilters.has(t.key as ConvStatus)))
+   910→                          ? "bg-primary-foreground/20"
+   911→                          : "bg-muted text-muted-foreground"
+   912→                      )}
+   913→                    >
+   914→                      {t.count}
+   915→                    </span>
+   916→                  </button>
+   917→                ))}
+   918→              </div>
+   919→
+   920→              {/* Filter dropdowns row */}
+   921→              <div className="flex items-center gap-1.5 flex-wrap">
+   922→                {/* Status multi-filter */}
+   923→                <DropdownMenu>
+   924→                  <DropdownMenuTrigger asChild>
+   925→                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+   926→                      <Filter className="size-3" />
+   927→                      Status
+   928→                      {statusFilters.size > 0 && (
+   929→                        <Badge variant="secondary" className="h-4 px-1 text-[10px]">{statusFilters.size}</Badge>
+   930→                      )}
+   931→                      <ChevronDown className="size-3 opacity-50" />
+   932→                    </Button>
+   933→                  </DropdownMenuTrigger>
+   934→                  <DropdownMenuContent align="start" className="w-40">
+   935→                    <DropdownMenuLabel className="text-xs">Status</DropdownMenuLabel>
+   936→                    <DropdownMenuSeparator />
+   937→                    {(["AI", "HUMAN", "CLOSED"] as ConvStatus[]).map((s) => (
+   938→                      <DropdownMenuCheckboxItem
+   939→                        key={s}
+   940→                        checked={statusFilters.has(s)}
+   941→                        onCheckedChange={(checked) => {
+   942→                          setStatusFilters((prev) => {
+   943→                            const next = new Set(prev);
+   944→                            if (checked) next.add(s);
+   945→                            else next.delete(s);
+   946→                            return next;
+   947→                          });
+   948→                        }}
+   949→                        onSelect={(e) => e.preventDefault()}
+   950→                        className="text-xs"
+   951→                      >
+   952→                        {statusLabel(s)}
+   953→                      </DropdownMenuCheckboxItem>
+   954→                    ))}
+   955→                  </DropdownMenuContent>
+   956→                </DropdownMenu>
+   957→
+   958→                {/* Channel filter */}
+   959→                <DropdownMenu>
+   960→                  <DropdownMenuTrigger asChild>
+   961→                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+   962→                      <Globe className="size-3" />
+   963→                      Channel
+   964→                      {channelFilters.size > 0 && (
+   965→                        <Badge variant="secondary" className="h-4 px-1 text-[10px]">{channelFilters.size}</Badge>
+   966→                      )}
+   967→                      <ChevronDown className="size-3 opacity-50" />
+   968→                    </Button>
+   969→                  </DropdownMenuTrigger>
+   970→                  <DropdownMenuContent align="start" className="w-40">
+   971→                    <DropdownMenuLabel className="text-xs">Channel</DropdownMenuLabel>
+   972→                    <DropdownMenuSeparator />
+   973→                    {(["WIDGET", "API"] as string[]).map((ch) => (
+   974→                      <DropdownMenuCheckboxItem
+   975→                        key={ch}
+   976→                        checked={channelFilters.has(ch)}
+   977→                        onCheckedChange={(checked) => {
+   978→                          setChannelFilters((prev) => {
+   979→                            const next = new Set(prev);
+   980→                            if (checked) next.add(ch);
+   981→                            else next.delete(ch);
+   982→                            return next;
+   983→                          });
+   984→                        }}
+   985→                        onSelect={(e) => e.preventDefault()}
+   986→                        className="text-xs"
+   987→                      >
+   988→                        {ch === "WIDGET" ? <Globe className="size-3 mr-2" /> : <Code className="size-3 mr-2" />}
+   989→                        {ch}
+   990→                      </DropdownMenuCheckboxItem>
+   991→                    ))}
+   992→                  </DropdownMenuContent>
+   993→                </DropdownMenu>
+   994→
+   995→                {/* Satisfaction filter */}
+   996→                <DropdownMenu>
+   997→                  <DropdownMenuTrigger asChild>
+   998→                    <Button
+   999→                      variant="outline"
+  1000→                      size="sm"
+  1001→                      className={cn("gap-1.5 h-7 text-xs", satisfactionFilter !== "all" && "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300")}
+  1002→                    >
+  1003→                      <Star className="size-3" />
+  1004→                      Satisfaction
+  1005→                      {satisfactionFilter !== "all" && (
+  1006→                        <Badge variant="secondary" className="h-4 px-1 text-[10px]">1</Badge>
+  1007→                      )}
+  1008→                      <ChevronDown className="size-3 opacity-50" />
+  1009→                    </Button>
+  1010→                  </DropdownMenuTrigger>
+  1011→                  <DropdownMenuContent align="start" className="w-40">
+  1012→                    <DropdownMenuLabel className="text-xs">Satisfaction</DropdownMenuLabel>
+  1013→                    <DropdownMenuSeparator />
+  1014→                    {([
+  1015→                      { key: "all", label: "All" },
+  1016→                      { key: "rated", label: "Rated" },
+  1017→                      { key: "unrated", label: "Unrated" },
+  1018→                      { key: "high", label: "High (4-5)" },
+  1019→                      { key: "low", label: "Low (1-2)" },
+  1020→                    ] as { key: typeof satisfactionFilter; label: string }[]).map((opt) => (
+  1021→                      <DropdownMenuItem
+  1022→                        key={opt.key}
+  1023→                        onClick={() => setSatisfactionFilter(opt.key)}
+  1024→                        className={cn("text-xs", satisfactionFilter === opt.key && "bg-accent")}
+  1025→                      >
+  1026→                        {satisfactionFilter === opt.key && <Check className="size-3 mr-2" />}
+  1027→                        {opt.label}
+  1028→                      </DropdownMenuItem>
+  1029→                    ))}
+  1030→                  </DropdownMenuContent>
+  1031→                </DropdownMenu>
+  1032→
+  1033→                {/* Date range filter */}
+  1034→                <Popover>
+  1035→                  <PopoverTrigger asChild>
+  1036→                    <Button
+  1037→                      variant="outline"
+  1038→                      size="sm"
+  1039→                      className={cn("gap-1.5 h-7 text-xs", datePreset !== "all" && "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300")}
+  1040→                    >
+  1041→                      <Calendar className="size-3" />
+  1042→                      {datePreset === "all" ? "Date" : datePreset === "7d" ? "7 days" : datePreset === "30d" ? "30 days" : "Custom"}
+  1043→                      <ChevronDown className="size-3 opacity-50" />
+  1044→                    </Button>
+  1045→                  </PopoverTrigger>
+  1046→                  <PopoverContent align="start" className="w-auto p-0">
+  1047→                    <div className="p-3 space-y-3">
+  1048→                      <div className="flex items-center gap-1.5">
+  1049→                        {(["7d", "30d"] as const).map((p) => (
+  1050→                          <Button
+  1051→                            key={p}
+  1052→                            variant={datePreset === p ? "default" : "outline"}
+  1053→                            size="sm"
+  1054→                            className="h-6 text-xs px-2"
+  1055→                            onClick={() => {
+  1056→                              setDatePreset(p);
+  1057→                              setDateRange(undefined);
+  1058→                            }}
+  1059→                          >
+  1060→                            {p === "7d" ? "Last 7 days" : "Last 30 days"}
+  1061→                          </Button>
+  1062→                        ))}
+  1063→                        <Button
+  1064→                          variant={datePreset === "custom" ? "default" : "outline"}
+  1065→                          size="sm"
+  1066→                          className="h-6 text-xs px-2"
+  1067→                          onClick={() => setDatePreset("custom")}
+  1068→                        >
+  1069→                          Custom
+  1070→                        </Button>
+  1071→                      </div>
+  1072→                      {datePreset === "custom" && (
+  1073→                        <CalendarPicker
+  1074→                          mode="range"
+  1075→                          selected={dateRange}
+  1076→                          onSelect={(range) => {
+  1077→                            setDateRange(range);
+  1078→                            if (range?.from) setDatePreset("custom");
+  1079→                          }}
+  1080→                          numberOfMonths={1}
+  1081→                          className="rounded-md border"
+  1082→                        />
+  1083→                      )}
+  1084→                      <div className="flex items-center justify-between">
+  1085→                        <Button
+  1086→                          variant="ghost"
+  1087→                          size="sm"
+  1088→                          className="h-6 text-xs"
+  1089→                          onClick={() => {
+  1090→                            setDatePreset("all");
+  1091→                            setDateRange(undefined);
+  1092→                          }}
+  1093→                        >
+  1094→                          Clear
+  1095→                        </Button>
+  1096→                        {datePreset === "custom" && dateRange?.from && (
+  1097→                          <span className="text-xs text-muted-foreground">
+  1098→                            {format(dateRange.from, "MMM d, yyyy")}
+  1099→                            {dateRange.to && ` – ${format(dateRange.to, "MMM d, yyyy")}`}
+  1100→                          </span>
+  1101→                        )}
+  1102→                      </div>
+  1103→                    </div>
+  1104→                  </PopoverContent>
+  1105→                </Popover>
+  1106→
+  1107→                {/* Active filter count */}
+  1108→                {activeFilterCount > 0 && (
+  1109→                  <Badge variant="secondary" className="h-5 text-[10px] gap-1">
+  1110→                    {activeFilterCount} active
+  1111→                    <button
+  1112→                      className="ml-0.5 hover:text-destructive"
+  1113→                      onClick={() => {
+  1114→                        setSearch("");
+  1115→                        setTab("ALL");
+  1116→                        setStatusFilters(new Set());
+  1117→                        setChannelFilters(new Set());
+  1118→                        setSatisfactionFilter("all");
+  1119→                        setDatePreset("all");
+  1120→                        setDateRange(undefined);
+  1121→                      }}
+  1122→                    >
+  1123→                      <X className="size-2.5" />
+  1124→                    </button>
+  1125→                  </Badge>
+  1126→                )}
+  1127→              </div>
+  1128→            </div>
+  1129→
+  1130→            {/* Conversation count */}
+  1131→            <div className="px-3 py-1.5 border-b bg-muted/30">
+  1132→              <span className="text-[10px] text-muted-foreground">
+  1133→                {filteredConversations.length} conversation{filteredConversations.length !== 1 ? "s" : ""}
+  1134→                {selectedConvos.size > 0 && (
+  1135→                  <span className="ml-2 text-primary font-medium">
+  1136→                    · {selectedConvos.size} selected
+  1137→                  </span>
+  1138→                )}
+  1139→              </span>
+  1140→            </div>
+  1141→
+  1142→            {/* List */}
+  1143→            <div className="flex-1 overflow-y-auto scroll-thin">
+  1144→              {loadingList && filteredConversations.length === 0 ? (
+  1145→                <ListSkeleton />
+  1146→              ) : filteredConversations.length === 0 ? (
+  1147→                <EmptyList
+  1148→                  onClearFilters={() => {
+  1149→                    setSearch("");
+  1150→                    setTab("ALL");
+  1151→                    setStatusFilters(new Set());
+  1152→                    setChannelFilters(new Set());
+  1153→                    setSatisfactionFilter("all");
+  1154→                    setDatePreset("all");
+  1155→                    setDateRange(undefined);
+  1156→                  }}
+  1157→                  hasFilters={activeFilterCount > 0}
+  1158→                />
+  1159→              ) : (
+  1160→                <ul className="divide-y">
+  1161→                  {filteredConversations.map((conv) => {
+  1162→                    const name = conv.visitorName || conv.visitorEmail || "Visitor";
+  1163→                    const isUnread = (unread[conv.id] ?? 0) > 0;
+  1164→                    const isSelected = conv.id === selectedId;
+  1165→                    const isChecked = selectedConvos.has(conv.id);
+  1166→                    // Search highlight helper
+  1167→                    const highlightText = (text: string) => {
+  1168→                      if (!debouncedSearch.trim()) return text;
+  1169→                      const q = debouncedSearch.trim();
+  1170→                      const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  1171→                      if (idx === -1) return text;
+  1172→                      return (
+  1173→                        <>
+  1174→                          {text.slice(0, idx)}
+  1175→                          <mark className="bg-amber-200/60 dark:bg-amber-500/30 rounded-sm px-0.5">
+  1176→                            {text.slice(idx, idx + q.length)}
+  1177→                          </mark>
+  1178→                          {text.slice(idx + q.length)}
+  1179→                        </>
+  1180→                      );
+  1181→                    };
+  1182→                    return (
+  1183→                      <li key={conv.id}>
+  1184→                        <button
+  1185→                          onClick={() => handleSelect(conv.id)}
+  1186→                          className={cn(
+  1187→                            "w-full flex items-start gap-3 px-3 py-3 text-left transition-all group relative",
+  1188→                            isSelected
+  1189→                              ? "bg-accent/60 border-l-2 border-l-violet-500"
+  1190→                              : isChecked
+  1191→                                ? "bg-primary/5 border-l-2 border-l-primary/40"
+  1192→                                : "hover:bg-muted/50 border-l-2 border-l-transparent hover:border-l-violet-300"
+  1193→                          )}
+  1194→                        >
+  1195→                          {/* Checkbox */}
+  1196→                          <span
+  1197→                            className="mt-1 shrink-0"
+  1198→                            onClick={(e) => { e.stopPropagation(); toggleConvoSelect(conv.id); }}
+  1199→                          >
+  1200→                            {isChecked ? (
+  1201→                              <SquareCheck className="size-4 text-primary" />
+  1202→                            ) : (
+  1203→                              <Square className="size-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+  1204→                            )}
+  1205→                          </span>
+  1206→                          <Avatar className="size-9 mt-0.5">
+  1207→                            <AvatarFallback
+  1208→                              className={cn(
+  1209→                                "text-white text-xs font-semibold",
+  1210→                                avatarColor(name)
+  1211→                              )}
+  1212→                            >
+  1213→                              {initials(conv.visitorName)}
+  1214→                            </AvatarFallback>
+  1215→                          </Avatar>
+  1216→                          <div className="flex-1 min-w-0">
+  1217→                            <div className="flex items-center justify-between gap-2">
+  1218→                              <span className="truncate text-sm font-medium">
+  1219→                                {highlightText(name)}
+  1220→                              </span>
+  1221→                              <span className="text-[10px] text-muted-foreground shrink-0" title={conv.lastMessage ? new Date(conv.lastMessage.createdAt).toLocaleString() : new Date(conv.updatedAt).toLocaleString()}>
+  1222→                                {conv.lastMessage
+  1223→                                  ? timeAgo(conv.lastMessage.createdAt)
+  1224→                                  : timeAgo(conv.updatedAt)}
+  1225→                              </span>
+  1226→                            </div>
+  1227→                            <div className="flex items-center gap-2 mt-0.5">
+  1228→                              <p className="flex-1 truncate text-xs text-muted-foreground">
+  1229→                                {conv.lastMessage
+  1230→                                  ? highlightText(conv.lastMessage.content)
+  1231→                                  : "No messages yet"}
+  1232→                              </p>
+  1233→                              {isUnread && (
+  1234→                                <span className="size-2 rounded-full bg-violet-500 shrink-0 animate-glow-pulse" />
+  1235→                              )}
+  1236→                            </div>
+  1237→                            <div className="flex items-center gap-1.5 mt-1.5">
+  1238→                              {/* Channel icon */}
+  1239→                              {conv.channel === "WIDGET" ? (
+  1240→                                <Globe className="size-3 text-muted-foreground/60" />
+  1241→                              ) : (
+  1242→                                <Code className="size-3 text-muted-foreground/60" />
+  1243→                              )}
+  1244→                              <Badge
+  1245→                                variant="outline"
+  1246→                                className={cn(
+  1247→                                  "text-[10px] px-1.5 py-0 h-4",
+  1248→                                  statusBadgeClass(conv.status)
+  1249→                                )}
+  1250→                              >
+  1251→                                {statusLabel(conv.status)}
+  1252→                              </Badge>
+  1253→                              {conv.messageCount > 0 && (
+  1254→                                <span className="text-[10px] text-muted-foreground">
+  1255→                                  {conv.messageCount} msg
+  1256→                                </span>
+  1257→                              )}
+  1258→                              {/* Satisfaction star */}
+  1259→                              {conv.satisfaction !== null && conv.satisfaction > 0 && (
+  1260→                                <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500">
+  1261→                                  <Star className="size-2.5 fill-amber-500" />
+  1262→                                  {conv.satisfaction}
+  1263→                                </span>
+  1264→                              )}
+  1265→                              {/* Glow dot for HUMAN conversations needing attention */}
+  1266→                              {conv.status === "HUMAN" && !conv.assignedToId && (
+  1267→                                <span className="size-2 rounded-full bg-violet-500 shrink-0 animate-glow-pulse" title="Needs attention" />
+  1268→                              )}
+  1269→                            </div>
+  1270→                          </div>
+  1271→                        </button>
+  1272→                      </li>
+  1273→                    );
+  1274→                  })}
+  1275→                </ul>
+  1276→              )}
+  1277→            </div>
+  1278→          </aside>
+  1279→
+  1280→          {/* ─── Right panel: chat view ──────────────────────── */}
+  1281→          <section
+  1282→            className={cn(
+  1283→              "flex-1 min-w-0 rounded-xl border bg-card overflow-hidden flex flex-col",
+  1284→              mobileView === "list" ? "hidden md:flex" : "flex"
+  1285→            )}
+  1286→          >
+  1287→            {!selectedId ? (
+  1288→              <EmptyDetail />
+  1289→            ) : (
+  1290→              <>
+  1291→                {/* Header */}
+  1292→                <header className="flex items-center gap-3 px-4 py-3 border-b">
+  1293→                  <Button
+  1294→                    variant="ghost"
+  1295→                    size="icon"
+  1296→                    className="md:hidden -ml-2 size-8"
+  1297→                    onClick={handleBack}
+  1298→                  >
+  1299→                    <ArrowLeft className="size-4" />
+  1300→                  </Button>
+  1301→                  {loadingDetail ? (
+  1302→                    <div className="flex items-center gap-3 flex-1">
+  1303→                      <Skeleton className="size-9 rounded-full" />
+  1304→                      <div className="space-y-1.5">
+  1305→                        <Skeleton className="h-3.5 w-32" />
+  1306→                        <Skeleton className="h-3 w-48" />
+  1307→                      </div>
+  1308→                    </div>
+  1309→                  ) : detail ? (
+  1310→                    <>
+  1311→                      <Avatar className="size-9">
+  1312→                        <AvatarFallback
+  1313→                          className={cn(
+  1314→                            "text-white text-xs font-semibold",
+  1315→                            avatarColor(
+  1316→                              detail.visitorName ||
+  1317→                                detail.visitorEmail ||
+  1318→                                "Visitor"
+  1319→                            )
+  1320→                          )}
+  1321→                        >
+  1322→                          {initials(detail.visitorName)}
+  1323→                        </AvatarFallback>
+  1324→                      </Avatar>
+  1325→                      <div className="flex-1 min-w-0">
+  1326→                        <div className="flex items-center gap-2">
+  1327→                          <span className="font-medium text-sm truncate">
+  1328→                            {detail.visitorName ||
+  1329→                              detail.visitorEmail ||
+  1330→                              "Visitor"}
+  1331→                          </span>
+  1332→                          <Badge
+  1333→                            variant="outline"
+  1334→                            className={cn(
+  1335→                              "text-[10px] px-1.5 py-0 h-4",
+  1336→                              statusBadgeClass(detail.status)
+  1337→                            )}
+  1338→                          >
+  1339→                            {statusLabel(detail.status)}
+  1340→                          </Badge>
+  1341→                        </div>
+  1342→                        <p className="text-xs text-muted-foreground truncate">
+  1343→                          {detail.visitorEmail || detail.visitorId}
+  1344→                        </p>
+  1345→                      </div>
+  1346→                      <div className="flex items-center gap-1">
+  1347→                        <Tooltip>
+  1348→                          <TooltipTrigger asChild>
+  1349→                            <Button
+  1350→                              size="sm"
+  1351→                              variant="outline"
+  1352→                              onClick={() => {
+  1353→                                if (summary && showSummary) {
+  1354→                                  setShowSummary(false);
+  1355→                                } else if (summary) {
+  1356→                                  setShowSummary(true);
+  1357→                                } else {
+  1358→                                  void generateSummary();
+  1359→                                }
+  1360→                              }}
+  1361→                              disabled={loadingSummary}
+  1362→                              className={cn(
+  1363→                                "gap-1.5",
+  1364→                                showSummary &&
+  1365→                                  "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+  1366→                              )}
+  1367→                            >
+  1368→                              {loadingSummary ? (
+  1369→                                <Clock className="size-3.5 animate-spin" />
+  1370→                              ) : (
+  1371→                                <Sparkles className="size-3.5" />
+  1372→                              )}
+  1373→                              <span className="hidden sm:inline">
+  1374→                                {loadingSummary
+  1375→                                  ? "Summarizing…"
+  1376→                                  : summary
+  1377→                                  ? showSummary
+  1378→                                    ? "Hide summary"
+  1379→                                    : "Show summary"
+  1380→                                  : "AI Summary"}
+  1381→                              </span>
+  1382→                            </Button>
+  1383→                          </TooltipTrigger>
+  1384→                          <TooltipContent>
+  1385→                            Generate an AI summary of this conversation
+  1386→                          </TooltipContent>
+  1387→                        </Tooltip>
+  1388→                        {detail.status !== "CLOSED" && (
+  1389→                          <>
+  1390→                            <Tooltip>
+  1391→                              <TooltipTrigger asChild>
+  1392→                                <Button
+  1393→                                  size="sm"
+  1394→                                  variant={
+  1395→                                    detail.status === "HUMAN"
+  1396→                                      ? "default"
+  1397→                                      : "outline"
+  1398→                                  }
+  1399→                                  onClick={() =>
+  1400→                                    void patchConversation({ status: "HUMAN" })
+  1401→                                  }
+  1402→                                  className="gap-1.5"
+  1403→                                >
+  1404→                                  <Headphones className="size-3.5" />
+  1405→                                  <span className="hidden sm:inline">
+  1406→                                    {detail.status === "HUMAN"
+  1407→                                      ? "Taken over"
+  1408→                                      : "Take over"}
+  1409→                                  </span>
+  1410→                                </Button>
+  1411→                              </TooltipTrigger>
+  1412→                              <TooltipContent>
+  1413→                                Take over from AI
+  1414→                              </TooltipContent>
+  1415→                            </Tooltip>
+  1416→                            <Tooltip>
+  1417→                              <TooltipTrigger asChild>
+  1418→                                <Button
+  1419→                                  size="sm"
+  1420→                                  variant="outline"
+  1421→                                  onClick={() =>
+  1422→                                    void patchConversation({ status: "CLOSED" })
+  1423→                                  }
+  1424→                                >
+  1425→                                  <X className="size-3.5" />
+  1426→                                  <span className="hidden sm:inline">
+  1427→                                    Close
+  1428→                                  </span>
+  1429→                                </Button>
+  1430→                              </TooltipTrigger>
+  1431→                              <TooltipContent>
+  1432→                                Close conversation
+  1433→                              </TooltipContent>
+  1434→                            </Tooltip>
+  1435→                          </>
+  1436→                        )}
+  1437→                        {detail.status === "CLOSED" && (
+  1438→                          <Button
+  1439→                            size="sm"
+  1440→                            variant="outline"
+  1441→                            onClick={() =>
+  1442→                              void patchConversation({ status: "AI" })
+  1443→                            }
+  1444→                            className="gap-1.5"
+  1445→                          >
+  1446→                            <Check className="size-3.5" />
+  1447→                            <span className="hidden sm:inline">Reopen</span>
+  1448→                          </Button>
+  1449→                        )}
+  1450→                        {/* Visitor info toggle */}
+  1451→                        <Tooltip>
+  1452→                          <TooltipTrigger asChild>
+  1453→                            <Button
+  1454→                              size="icon"
+  1455→                              variant="ghost"
+  1456→                              className={cn(
+  1457→                                "size-8",
+  1458→                                showVisitorPanel &&
+  1459→                                  "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+  1460→                              )}
+  1461→                              onClick={() => setShowVisitorPanel((v) => !v)}
+  1462→                            >
+  1463→                              <UserIcon className="size-4" />
+  1464→                            </Button>
+  1465→                          </TooltipTrigger>
+  1466→                          <TooltipContent>Visitor info</TooltipContent>
+  1467→                        </Tooltip>
+  1468→                        {/* Assign dropdown */}
+  1469→                        <DropdownMenu>
+  1470→                          <DropdownMenuTrigger asChild>
+  1471→                            <Button size="icon" variant="ghost" className="size-8">
+  1472→                              <MoreVertical className="size-4" />
+  1473→                            </Button>
+  1474→                          </DropdownMenuTrigger>
+  1475→                          <DropdownMenuContent align="end" className="w-60">
+  1476→                            <DropdownMenuLabel>Assign to</DropdownMenuLabel>
+  1477→                            <DropdownMenuSeparator />
+  1478→                            <DropdownMenuItem
+  1479→                              onClick={() =>
+  1480→                                void patchConversation({
+  1481→                                  assignedToId: null,
+  1482→                                })
+  1483→                              }
+  1484→                            >
+  1485→                              <UserIcon className="size-3.5 mr-2" />
+  1486→                              Unassign
+  1487→                            </DropdownMenuItem>
+  1488→                            {members.map((m) => (
+  1489→                              <DropdownMenuItem
+  1490→                                key={m.id}
+  1491→                                onClick={() =>
+  1492→                                  void patchConversation({
+  1493→                                    assignedToId: m.id,
+  1494→                                  })
+  1495→                                }
+  1496→                                className={cn(
+  1497→                                  detail.assignedToId === m.id &&
+  1498→                                    "bg-violet-50 dark:bg-violet-950/30"
+  1499→                                )}
+  1500→                              >
+  1501→                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-[9px] font-semibold mr-2">
+  1502→                                  {m.name.charAt(0).toUpperCase()}
+  1503→                                </div>
+  1504→                                <span className="truncate">{m.name}</span>
+  1505→                                {detail.assignedToId === m.id && (
+  1506→                                  <Check className="size-3 ml-auto text-violet-600" />
+  1507→                                )}
+  1508→                              </DropdownMenuItem>
+  1509→                            ))}
+  1510→                            {members.length === 0 && (
+  1511→                              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+  1512→                                No team members yet
+  1513→                              </div>
+  1514→                            )}
+  1515→                            <DropdownMenuSeparator />
+  1516→                            <DropdownMenuLabel>Channel</DropdownMenuLabel>
+  1517→                            <DropdownMenuItem disabled>
+  1518→                              <MessageSquare className="size-3.5 mr-2" />
+  1519→                              {detail.channel}
+  1520→                            </DropdownMenuItem>
+  1521→                          </DropdownMenuContent>
+  1522→                        </DropdownMenu>
+  1523→                      </div>
+  1524→                    </>
+  1525→                  ) : null}
+  1526→                </header>
+  1527→
+  1528→                {/* AI Summary panel */}
+  1529→                {showSummary && detail && (
+  1530→                  <div className="border-b bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3">
+  1531→                    <div className="max-w-2xl mx-auto">
+  1532→                      <div className="flex items-center gap-2 mb-1.5">
+  1533→                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
+  1534→                          <Sparkles className="size-3.5" />
+  1535→                        </div>
+  1536→                        <span className="text-xs font-semibold text-violet-900 dark:text-violet-100">
+  1537→                          AI Summary
+  1538→                        </span>
+  1539→                        <button
+  1540→                          onClick={() => setShowSummary(false)}
+  1541→                          className="ml-auto text-violet-400 hover:text-violet-600 dark:hover:text-violet-200"
+  1542→                        >
+  1543→                          <X className="size-3.5" />
+  1544→                        </button>
+  1545→                      </div>
+  1546→                      {loadingSummary ? (
+  1547→                        <div className="space-y-1.5">
+  1548→                          <Skeleton className="h-3 w-full" />
+  1549→                          <Skeleton className="h-3 w-5/6" />
+  1550→                          <Skeleton className="h-3 w-2/3" />
+  1551→                        </div>
+  1552→                      ) : (
+  1553→                        <p className="text-xs text-violet-900/80 dark:text-violet-100/80 leading-relaxed">
+  1554→                          {summary}
+  1555→                        </p>
+  1556→                      )}
+  1557→                    </div>
+  1558→                  </div>
+  1559→                )}
+  1560→
+  1561→                {/* Messages + Visitor panel row */}
+  1562→                <div className="flex-1 flex min-h-0">
+  1563→                {/* Messages */}
+  1564→                <div className="flex-1 overflow-y-auto scroll-thin px-4 py-4 bg-muted/30">
+  1565→                  {loadingDetail ? (
+  1566→                    <div className="space-y-3 max-w-2xl mx-auto">
+  1567→                      {Array.from({ length: 4 }).map((_, i) => (
+  1568→                        <div
+  1569→                          key={i}
+  1570→                          className={cn(
+  1571→                            "flex gap-2",
+  1572→                            i % 2 === 0 ? "justify-start" : "justify-end"
+  1573→                          )}
+  1574→                        >
+  1575→                          {i % 2 === 0 && (
+  1576→                            <Skeleton className="size-7 rounded-full shrink-0" />
+  1577→                          )}
+  1578→                          <Skeleton
+  1579→                            className={cn(
+  1580→                              "h-12 rounded-2xl",
+  1581→                              i % 2 === 0 ? "w-64" : "w-48"
+  1582→                            )}
+  1583→                          />
+  1584→                        </div>
+  1585→                      ))}
+  1586→                    </div>
+  1587→                  ) : (
+  1588→                    <MessageList messages={messages} aiTyping={aiTyping} />
+  1589→                  )}
+  1590→                  <div ref={messagesEndRef} />
+  1591→                </div>
+  1592→
+  1593→                {/* Composer */}
+  1594→                <div className="border-t p-3 bg-card space-y-2">
+  1595→                  {/* AI Reply Suggestions */}
+  1596→                  {detail && detail.status !== "CLOSED" && messages.length > 0 && (
+  1597→                    <div className="space-y-1.5">
+  1598→                      <div className="flex items-center gap-1.5">
+  1599→                        <Wand2 className="size-3 text-violet-500" />
+  1600→                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+  1601→                          AI suggested replies
+  1602→                        </span>
+  1603→                        <Button
+  1604→                          variant="ghost"
+  1605→                          size="sm"
+  1606→                          className="h-5 px-1.5 text-[10px] text-violet-600 hover:text-violet-700"
+  1607→                          onClick={() => void loadSuggestions()}
+  1608→                          disabled={loadingSuggestions}
+  1609→                        >
+  1610→                          {loadingSuggestions ? (
+  1611→                            <>
+  1612→                              <Clock className="size-3 mr-1 animate-spin" /> Thinking…
+  1613→                            </>
+  1614→                          ) : (
+  1615→                            <>
+  1616→                              <Sparkles className="size-3 mr-1" /> Refresh
+  1617→                            </>
+  1618→                          )}
+  1619→                        </Button>
+  1620→                      </div>
+  1621→                      {loadingSuggestions && suggestions.length === 0 ? (
+  1622→                        <div className="flex gap-2">
+  1623→                          {[0, 1, 2].map((i) => (
+  1624→                            <Skeleton key={i} className="h-8 flex-1 rounded-lg" />
+  1625→                          ))}
+  1626→                        </div>
+  1627→                      ) : (
+  1628→                        <div className="flex flex-wrap gap-1.5">
+  1629→                          {suggestions.map((s, i) => (
+  1630→                            <button
+  1631→                              key={i}
+  1632→                              onClick={() => setDraft(s)}
+  1633→                              className="group flex items-start gap-1.5 rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50/50 dark:bg-violet-950/20 px-2.5 py-1.5 text-left text-xs text-violet-900 dark:text-violet-100 hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors max-w-full"
+  1634→                            >
+  1635→                              <Sparkles className="size-3 mt-0.5 shrink-0 text-violet-500 opacity-60 group-hover:opacity-100" />
+  1636→                              <span className="line-clamp-2 flex-1">{s}</span>
+  1637→                            </button>
+  1638→                          ))}
+  1639→                        </div>
+  1640→                      )}
+  1641→                    </div>
+  1642→                  )}
+  1643→
+  1644→                  <div className="flex items-end gap-2">
+  1645→                    {/* Canned responses dropdown */}
+  1646→                    {detail && detail.status !== "CLOSED" && canned.length > 0 && (
+  1647→                      <DropdownMenu open={cannedOpen} onOpenChange={setCannedOpen}>
+  1648→                        <DropdownMenuTrigger asChild>
+  1649→                          <Button
+  1650→                            variant="outline"
+  1651→                            size="icon"
+  1652→                            className="size-10 shrink-0"
+  1653→                            aria-label="Quick replies"
+  1654→                          >
+  1655→                            <Zap className="size-4" />
+  1656→                          </Button>
+  1657→                        </DropdownMenuTrigger>
+  1658→                        <DropdownMenuContent align="start" className="w-72">
+  1659→                          <DropdownMenuLabel className="flex items-center gap-2">
+  1660→                            <Zap className="size-3.5" /> Quick replies
+  1661→                          </DropdownMenuLabel>
+  1662→                          <DropdownMenuSeparator />
+  1663→                          <div className="max-h-72 overflow-y-auto scroll-thin">
+  1664→                            {canned.map((c) => (
+  1665→                              <DropdownMenuItem
+  1666→                                key={c.id}
+  1667→                                onClick={() => {
+  1668→                                  setDraft(c.content);
+  1669→                                  setCannedOpen(false);
+  1670→                                }}
+  1671→                                className="flex-col items-start gap-0.5 py-2"
+  1672→                              >
+  1673→                                <div className="flex items-center gap-2 w-full">
+  1674→                                  <span className="text-xs font-medium">{c.title}</span>
+  1675→                                  {c.shortcut && (
+  1676→                                    <Badge variant="secondary" className="ml-auto text-[9px] h-4 px-1 font-mono">
+  1677→                                      {c.shortcut}
+  1678→                                    </Badge>
+  1679→                                  )}
+  1680→                                </div>
+  1681→                                <span className="text-[11px] text-muted-foreground line-clamp-1">
+  1682→                                  {c.content}
+  1683→                                </span>
+  1684→                              </DropdownMenuItem>
+  1685→                            ))}
+  1686→                          </div>
+  1687→                        </DropdownMenuContent>
+  1688→                      </DropdownMenu>
+  1689→                    )}
+  1690→                    <Textarea
+  1691→                      value={draft}
+  1692→                      onChange={(e) => setDraft(e.target.value)}
+  1693→                      onKeyDown={(e) => {
+  1694→                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+  1695→                          e.preventDefault();
+  1696→                          void sendMessage();
+  1697→                        }
+  1698→                      }}
+  1699→                      placeholder={
+  1700→                        detail?.status === "CLOSED"
+  1701→                          ? "This conversation is closed"
+  1702→                          : "Type your reply… (⌘+Enter to send)"
+  1703→                      }
+  1704→                      disabled={detail?.status === "CLOSED"}
+  1705→                      rows={2}
+  1706→                      className="resize-none min-h-[44px] max-h-40 bg-background"
+  1707→                    />
+  1708→                    <Button
+  1709→                      onClick={() => void sendMessage()}
+  1710→                      disabled={
+  1711→                        !draft.trim() ||
+  1712→                        sending ||
+  1713→                        detail?.status === "CLOSED"
+  1714→                      }
+  1715→                      size="icon"
+  1716→                      className="size-10 shrink-0"
+  1717→                    >
+  1718→                      <Send className="size-4" />
+  1719→                    </Button>
+  1720→                  </div>
+  1721→                  <div className="flex items-center justify-between mt-1.5 px-1">
+  1722→                    <span className="text-[10px] text-muted-foreground">
+  1723→                      {detail?.status === "CLOSED"
+  1724→                        ? "Reopen to send messages"
+  1725→                        : "⌘+Enter to send"}
+  1726→                    </span>
+  1727→                    <div className="flex items-center gap-3">
+  1728→                      {detail && (
+  1729→                        <span className="text-[10px] text-muted-foreground">
+  1730→                          {messages.length} messages
+  1731→                        </span>
+  1732→                      )}
+  1733→                      {draft.length > 0 && (
+  1734→                        <span className={cn(
+  1735→                          "text-[10px] font-mono",
+  1736→                          draft.length > 800 ? "text-amber-500" : "text-muted-foreground"
+  1737→                        )}>
+  1738→                          {draft.length}
+  1739→                        </span>
+  1740→                      )}
+  1741→                    </div>
+  1742→                  </div>
+  1743→                </div>
+  1744→
+  1745→                {/* Visitor info panel (inside flex row, beside messages) */}
+  1746→                {showVisitorPanel && detail && (
+  1747→                  <aside className="hidden lg:flex w-72 shrink-0 border-l bg-card flex-col overflow-y-auto scroll-thin">
+  1748→                    <div className="flex items-center justify-between px-4 py-3 border-b">
+  1749→                      <span className="text-sm font-semibold">Visitor info</span>
+  1750→                      <Button
+  1751→                        variant="ghost"
+  1752→                        size="icon"
+  1753→                        className="size-7"
+  1754→                        onClick={() => setShowVisitorPanel(false)}
+  1755→                      >
+  1756→                        <X className="size-3.5" />
+  1757→                      </Button>
+  1758→                    </div>
+  1759→                    <div className="p-4 space-y-5">
+  1760→                      {/* Avatar + identity */}
+  1761→                      <div className="flex flex-col items-center text-center pb-4 border-b">
+  1762→                        <Avatar className="size-16 mb-2">
+  1763→                          <AvatarFallback
+  1764→                            className={cn(
+  1765→                              "text-white text-lg font-semibold",
+  1766→                              avatarColor(
+  1767→                                detail.visitorName ||
+  1768→                                  detail.visitorEmail ||
+  1769→                                  "Visitor"
+  1770→                              )
+  1771→                            )}
+  1772→                          >
+  1773→                            {initials(detail.visitorName)}
+  1774→                          </AvatarFallback>
+  1775→                        </Avatar>
+  1776→                        <div className="text-sm font-medium">
+  1777→                          {detail.visitorName || "Anonymous Visitor"}
+  1778→                        </div>
+  1779→                        {detail.visitorEmail && (
+  1780→                          <div className="text-xs text-muted-foreground truncate w-full mt-0.5">
+  1781→                            {detail.visitorEmail}
+  1782→                          </div>
+  1783→                        )}
+  1784→                        <Badge
+  1785→                          variant="outline"
+  1786→                          className={cn(
+  1787→                            "text-[10px] px-1.5 py-0 h-4 mt-2",
+  1788→                            statusBadgeClass(detail.status)
+  1789→                          )}
+  1790→                        >
+  1791→                          {statusLabel(detail.status)}
+  1792→                        </Badge>
+  1793→                      </div>
+  1794→
+  1795→                      {/* Stats */}
+  1796→                      <div className="grid grid-cols-2 gap-2">
+  1797→                        <div className="rounded-lg border p-2.5 text-center">
+  1798→                          <div className="text-lg font-bold text-violet-600 dark:text-violet-400">
+  1799→                            {detail.visitor?.totalConversations ?? 1}
+  1800→                          </div>
+  1801→                          <div className="text-[10px] text-muted-foreground">
+  1802→                            Conversations
+  1803→                          </div>
+  1804→                        </div>
+  1805→                        <div className="rounded-lg border p-2.5 text-center">
+  1806→                          <div className="text-lg font-bold text-fuchsia-600 dark:text-fuchsia-400">
+  1807→                            {detail.visitor?.totalMessages ?? messages.length}
+  1808→                          </div>
+  1809→                          <div className="text-[10px] text-muted-foreground">
+  1810→                            Messages
+  1811→                          </div>
+  1812→                        </div>
+  1813→                      </div>
+  1814→
+  1815→                      {/* Details */}
+  1816→                      <div className="space-y-2.5 text-xs">
+  1817→                        <div className="flex items-start gap-2">
+  1818→                          <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+  1819→                          <div>
+  1820→                            <div className="text-muted-foreground">First seen</div>
+  1821→                            <div className="font-medium">
+  1822→                              {timeAgo(detail.visitor?.firstSeen || detail.createdAt)}
+  1823→                            </div>
+  1824→                          </div>
+  1825→                        </div>
+  1826→                        <div className="flex items-start gap-2">
+  1827→                          <MessageSquare className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+  1828→                          <div>
+  1829→                            <div className="text-muted-foreground">Channel</div>
+  1830→                            <div className="font-medium">{detail.channel}</div>
+  1831→                          </div>
+  1832→                        </div>
+  1833→                        {detail.assignedAgent && (
+  1834→                          <div className="flex items-start gap-2">
+  1835→                            <Headphones className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+  1836→                            <div>
+  1837→                              <div className="text-muted-foreground">Assigned to</div>
+  1838→                              <div className="font-medium">{detail.assignedAgent.name}</div>
+  1839→                            </div>
+  1840→                          </div>
+  1841→                        )}
+  1842→                        {detail.satisfaction !== null && (
+  1843→                          <div className="flex items-start gap-2">
+  1844→                            <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+  1845→                            <div>
+  1846→                              <div className="text-muted-foreground">Satisfaction</div>
+  1847→                              <div className="font-medium">
+  1848→                                {detail.satisfaction}/5
+  1849→                              </div>
+  1850→                            </div>
+  1851→                          </div>
+  1852→                        )}
+  1853→                      </div>
+  1854→
+  1855→                      {/* Visitor ID */}
+  1856→                      <div className="pt-3 border-t">
+  1857→                        <div className="text-[10px] text-muted-foreground mb-1">
+  1858→                          Visitor ID
+  1859→                        </div>
+  1860→                        <code className="text-[10px] bg-muted px-2 py-1 rounded block break-all">
+  1861→                          {detail.visitorId}
+  1862→                        </code>
+  1863→                      </div>
+  1864→                    </div>
+  1865→                  </aside>
+  1866→                )}
+  1867→
+  1868→                {/* Mobile visitor panel (Sheet/Drawer) */}
+  1869→                <Sheet open={showVisitorPanel && !!detail} onOpenChange={setShowVisitorPanel}>
+  1870→                  <SheetContent side="right" className="w-80 p-0 lg:hidden">
+  1871→                    <SheetHeader className="px-4 py-3 border-b">
+  1872→                      <SheetTitle className="text-sm">Visitor info</SheetTitle>
+  1873→                    </SheetHeader>
+  1874→                    {detail && (
+  1875→                      <div className="p-4 space-y-5 overflow-y-auto scroll-thin">
+  1876→                        {/* Avatar + identity */}
+  1877→                        <div className="flex flex-col items-center text-center pb-4 border-b">
+  1878→                          <Avatar className="size-16 mb-2">
+  1879→                            <AvatarFallback
+  1880→                              className={cn(
+  1881→                                "text-white text-lg font-semibold",
+  1882→                                avatarColor(
+  1883→                                  detail.visitorName ||
+  1884→                                    detail.visitorEmail ||
+  1885→                                    "Visitor"
+  1886→                                )
+  1887→                              )}
+  1888→                            >
+  1889→                              {initials(detail.visitorName)}
+  1890→                            </AvatarFallback>
+  1891→                          </Avatar>
+  1892→                          <div className="text-sm font-medium">
+  1893→                            {detail.visitorName || "Anonymous Visitor"}
+  1894→                          </div>
+  1895→                          {detail.visitorEmail && (
+  1896→                            <div className="text-xs text-muted-foreground truncate w-full mt-0.5">
+  1897→                              {detail.visitorEmail}
+  1898→                            </div>
+  1899→                          )}
+  1900→                          <Badge
+  1901→                            variant="outline"
+  1902→                            className={cn(
+  1903→                              "text-[10px] px-1.5 py-0 h-4 mt-2",
+  1904→                              statusBadgeClass(detail.status)
+  1905→                            )}
+  1906→                          >
+  1907→                            {statusLabel(detail.status)}
+  1908→                          </Badge>
+  1909→                        </div>
+  1910→
+  1911→                        {/* Stats */}
+  1912→                        <div className="grid grid-cols-2 gap-2">
+  1913→                          <div className="rounded-lg border p-2.5 text-center">
+  1914→                            <div className="text-lg font-bold text-violet-600 dark:text-violet-400">
+  1915→                              {detail.visitor?.totalConversations ?? 1}
+  1916→                            </div>
+  1917→                            <div className="text-[10px] text-muted-foreground">
+  1918→                              Conversations
+  1919→                            </div>
+  1920→                          </div>
+  1921→                          <div className="rounded-lg border p-2.5 text-center">
+  1922→                            <div className="text-lg font-bold text-fuchsia-600 dark:text-fuchsia-400">
+  1923→                              {detail.visitor?.totalMessages ?? messages.length}
+  1924→                            </div>
+  1925→                            <div className="text-[10px] text-muted-foreground">
+  1926→                              Messages
+  1927→                            </div>
+  1928→                          </div>
+  1929→                        </div>
+  1930→
+  1931→                        {/* Details */}
+  1932→                        <div className="space-y-2.5 text-xs">
+  1933→                          <div className="flex items-start gap-2">
+  1934→                            <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+  1935→                            <div>
+  1936→                              <div className="text-muted-foreground">First seen</div>
+  1937→                              <div className="font-medium">
+  1938→                                {timeAgo(detail.visitor?.firstSeen || detail.createdAt)}
+  1939→                              </div>
+  1940→                            </div>
+  1941→                          </div>
+  1942→                          <div className="flex items-start gap-2">
+  1943→                            <MessageSquare className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+  1944→                            <div>
+  1945→                              <div className="text-muted-foreground">Channel</div>
+  1946→                              <div className="font-medium">{detail.channel}</div>
+  1947→                            </div>
+  1948→                          </div>
+  1949→                          {detail.assignedAgent && (
+  1950→                            <div className="flex items-start gap-2">
+  1951→                              <Headphones className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+  1952→                              <div>
+  1953→                                <div className="text-muted-foreground">Assigned to</div>
+  1954→                                <div className="font-medium">{detail.assignedAgent.name}</div>
+  1955→                              </div>
+  1956→                            </div>
+  1957→                          )}
+  1958→                          {detail.satisfaction !== null && (
+  1959→                            <div className="flex items-start gap-2">
+  1960→                              <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+  1961→                              <div>
+  1962→                                <div className="text-muted-foreground">Satisfaction</div>
+  1963→                                <div className="font-medium">
+  1964→                                  {detail.satisfaction}/5
+  1965→                                </div>
+  1966→                              </div>
+  1967→                            </div>
+  1968→                          )}
+  1969→                        </div>
+  1970→
+  1971→                        {/* Visitor ID */}
+  1972→                        <div className="pt-3 border-t">
+  1973→                          <div className="text-[10px] text-muted-foreground mb-1">
+  1974→                            Visitor ID
+  1975→                          </div>
+  1976→                          <code className="text-[10px] bg-muted px-2 py-1 rounded block break-all">
+  1977→                            {detail.visitorId}
+  1978→                          </code>
+  1979→                        </div>
+  1980→                      </div>
+  1981→                    )}
+  1982→                  </SheetContent>
+  1983→                </Sheet>
+  1984→                </div>
+  1985→                {/* /Messages + Visitor panel row */}
+  1986→              </>
+  1987→            )}
+  1988→          </section>
+  1989→        </div>
+  1990→
+  1991→        {/* Bulk actions bar */}
+  1992→        <AnimatePresence>
+  1993→          {selectedConvos.size > 0 && (
+  1994→            <motion.div
+  1995→              initial={{ opacity: 0, y: 40 }}
+  1996→              animate={{ opacity: 1, y: 0 }}
+  1997→              exit={{ opacity: 0, y: 40 }}
+  1998→              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+  1999→              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border bg-card shadow-2xl px-4 py-2.5"
+  2000→            >
+
+[showing lines 1-2000 of 2425; use offset=2001 with limit to continue reading]

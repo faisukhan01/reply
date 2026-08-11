@@ -39,7 +39,14 @@ import {
   Globe,
   Code,
   Command,
+  Tag as TagIcon,
+  Plus,
+  Pencil,
+  Settings2,
+  ChevronsUpDown,
+  Hash,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -87,6 +94,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 // ─── Types ────────────────────────────────────────────────────────
 type ConvStatus = "AI" | "HUMAN" | "CLOSED";
@@ -139,7 +160,66 @@ type ConversationDetail = {
     totalMessages: number;
     firstSeen: string;
   };
+  tags: ConversationTagInfo[];
 };
+
+// ─── Tags ────────────────────────────────────────────────────────
+type TagColor = "violet" | "emerald" | "amber" | "fuchsia" | "rose" | "sky";
+
+type OrgTag = {
+  id: string;
+  name: string;
+  color: TagColor;
+  conversations: number;
+  createdAt: string;
+};
+
+type ConversationTagInfo = {
+  id: string;
+  name: string;
+  color: TagColor;
+  assignedAt?: string;
+};
+
+const TAG_COLORS: TagColor[] = [
+  "violet",
+  "emerald",
+  "amber",
+  "fuchsia",
+  "rose",
+  "sky",
+];
+
+function tagBadgeClass(color: string): string {
+  switch (color) {
+    case "violet":
+      return "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 border-violet-200 dark:border-violet-500/30";
+    case "emerald":
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30";
+    case "amber":
+      return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30";
+    case "fuchsia":
+      return "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-500/30";
+    case "rose":
+      return "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border-rose-200 dark:border-rose-500/30";
+    case "sky":
+      return "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 border-sky-200 dark:border-sky-500/30";
+    default:
+      return "bg-muted text-muted-foreground border-border";
+  }
+}
+
+function tagDotClass(color: string): string {
+  switch (color) {
+    case "violet": return "bg-violet-500";
+    case "emerald": return "bg-emerald-500";
+    case "amber": return "bg-amber-500";
+    case "fuchsia": return "bg-fuchsia-500";
+    case "rose": return "bg-rose-500";
+    case "sky": return "bg-sky-500";
+    default: return "bg-muted-foreground";
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -309,6 +389,18 @@ export default function ConversationsPage() {
 
   // Bulk delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // ─── Tags state ──────────────────────────────────────────────────
+  const [orgTags, setOrgTags] = useState<OrgTag[]>([]);
+  const [tagsPanelOpen, setTagsPanelOpen] = useState(false);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [tagDialogMode, setTagDialogMode] = useState<"create" | "edit">("create");
+  const [tagDialogId, setTagDialogId] = useState<string | null>(null);
+  const [tagDialogName, setTagDialogName] = useState("");
+  const [tagDialogColor, setTagDialogColor] = useState<TagColor>("violet");
+  const [tagSaving, setTagSaving] = useState(false);
+  const [tagDeleteId, setTagDeleteId] = useState<string | null>(null);
+  const [tagTogglingId, setTagTogglingId] = useState<string | null>(null);
 
   // Search ref for ⌘F shortcut
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -781,6 +873,187 @@ export default function ConversationsPage() {
     }
   }, [selectedId, messages.length, suggestions.length, loadSuggestions]);
 
+  // ─── Tags: fetch org tags on mount ──────────────────────────────
+  const fetchOrgTags = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tags", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setOrgTags(data.tags ?? []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchOrgTags();
+  }, [fetchOrgTags]);
+
+  // ─── Tags: open create dialog ───────────────────────────────────
+  const openCreateTagDialog = useCallback(() => {
+    setTagDialogMode("create");
+    setTagDialogId(null);
+    setTagDialogName("");
+    setTagDialogColor("violet");
+    setTagDialogOpen(true);
+  }, []);
+
+  // ─── Tags: open edit dialog ─────────────────────────────────────
+  const openEditTagDialog = useCallback((tag: OrgTag) => {
+    setTagDialogMode("edit");
+    setTagDialogId(tag.id);
+    setTagDialogName(tag.name);
+    setTagDialogColor(tag.color);
+    setTagDialogOpen(true);
+  }, []);
+
+  // ─── Tags: save (create or update) ──────────────────────────────
+  const saveTag = useCallback(async () => {
+    const name = tagDialogName.trim();
+    if (!name) {
+      toast.error("Tag name is required");
+      return;
+    }
+    if (tagSaving) return;
+    setTagSaving(true);
+    try {
+      const isEdit = tagDialogMode === "edit" && tagDialogId;
+      const res = await fetch(
+        isEdit ? `/api/tags/${tagDialogId}` : "/api/tags",
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, color: tagDialogColor }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ?? "Failed to save tag");
+        return;
+      }
+      const data = await res.json();
+      const saved: OrgTag = {
+        id: data.tag.id,
+        name: data.tag.name,
+        color: data.tag.color,
+        conversations: data.tag.conversations ?? 0,
+        createdAt: data.tag.createdAt,
+      };
+      setOrgTags((prev) => {
+        if (isEdit) {
+          return prev.map((t) => (t.id === saved.id ? saved : t));
+        }
+        const exists = prev.some((t) => t.id === saved.id);
+        if (exists) return prev.map((t) => (t.id === saved.id ? saved : t));
+        return [...prev, saved].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      // If editing, also update detail tags in case the conversation has it.
+      setDetail((d) => {
+        if (!d) return d;
+        return {
+          ...d,
+          tags: d.tags.map((t) =>
+            t.id === saved.id
+              ? { id: saved.id, name: saved.name, color: saved.color, assignedAt: t.assignedAt }
+              : t
+          ),
+        };
+      });
+      toast.success(isEdit ? "Tag updated" : "Tag created");
+      setTagDialogOpen(false);
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setTagSaving(false);
+    }
+  }, [tagDialogId, tagDialogMode, tagDialogName, tagDialogColor, tagSaving]);
+
+  // ─── Tags: delete ───────────────────────────────────────────────
+  const deleteTag = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/tags/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          toast.error(data?.error ?? "Failed to delete tag");
+          return;
+        }
+        setOrgTags((prev) => prev.filter((t) => t.id !== id));
+        setDetail((d) => (d ? { ...d, tags: d.tags.filter((t) => t.id !== id) } : d));
+        toast.success("Tag deleted");
+        setTagDeleteId(null);
+      } catch {
+        toast.error("Something went wrong");
+      }
+    },
+    []
+  );
+
+  // ─── Tags: toggle a tag on the selected conversation ────────────
+  const toggleConversationTag = useCallback(
+    async (tagId: string, currentlyAttached: boolean) => {
+      if (!selectedId || tagTogglingId) return;
+      setTagTogglingId(tagId);
+      const tag = orgTags.find((t) => t.id === tagId);
+      // Optimistic update
+      setDetail((d) => {
+        if (!d) return d;
+        if (currentlyAttached) {
+          return { ...d, tags: d.tags.filter((t) => t.id !== tagId) };
+        }
+        if (!tag || d.tags.some((t) => t.id === tagId)) return d;
+        return {
+          ...d,
+          tags: [...d.tags, { id: tag.id, name: tag.name, color: tag.color }],
+        };
+      });
+      try {
+        const res = await fetch(`/api/conversations/${selectedId}/tags`, {
+          method: currentlyAttached ? "DELETE" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagId }),
+        });
+        if (!res.ok) {
+          // Revert on failure
+          setDetail((d) => {
+            if (!d || !tag) return d;
+            if (currentlyAttached) {
+              return {
+                ...d,
+                tags: [
+                  ...d.tags,
+                  { id: tag.id, name: tag.name, color: tag.color },
+                ],
+              };
+            }
+            return { ...d, tags: d.tags.filter((t) => t.id !== tagId) };
+          });
+          toast.error("Failed to update tags");
+          return;
+        }
+        // Update conversation counts on org tags
+        setOrgTags((prev) =>
+          prev.map((t) =>
+            t.id === tagId
+              ? {
+                  ...t,
+                  conversations: Math.max(
+                    0,
+                    t.conversations + (currentlyAttached ? -1 : 1)
+                  ),
+                }
+              : t
+          )
+        );
+      } catch {
+        toast.error("Something went wrong");
+      } finally {
+        setTagTogglingId(null);
+      }
+    },
+    [selectedId, orgTags, tagTogglingId]
+  );
+
   const handleSelect = (id: string) => {
     setSelectedId(id);
     setMobileView("detail");
@@ -839,6 +1112,106 @@ export default function ConversationsPage() {
             </Button>
           </div>
         </div>
+
+        {/* ─── Tags management (collapsible) ─────────────────────── */}
+        <Collapsible
+          open={tagsPanelOpen}
+          onOpenChange={setTagsPanelOpen}
+          className="rounded-xl border bg-card overflow-hidden"
+        >
+          <div className="flex items-center gap-2 px-4 py-2.5">
+            <CollapsibleTrigger asChild>
+              <button
+                className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                aria-label="Toggle tags panel"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-violet-500/15 to-fuchsia-500/15 border border-violet-200/60 dark:border-violet-700/30">
+                  <TagIcon className="size-3.5 text-violet-600 dark:text-violet-400" />
+                </div>
+                <span className="text-sm font-medium">Tags</span>
+                <Badge variant="secondary" className="h-5 text-[10px]">
+                  {orgTags.length}
+                </Badge>
+                <ChevronsUpDown className="size-3.5 text-muted-foreground ml-1" />
+              </button>
+            </CollapsibleTrigger>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={openCreateTagDialog}
+            >
+              <Plus className="size-3.5" />
+              <span className="hidden sm:inline">Create tag</span>
+            </Button>
+          </div>
+          <CollapsibleContent>
+            <div className="border-t px-4 py-3">
+              {orgTags.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-6">
+                  <div className="size-10 rounded-xl bg-gradient-to-br from-violet-500/15 to-fuchsia-500/15 border border-violet-200/60 dark:border-violet-700/30 flex items-center justify-center mb-2">
+                    <TagIcon className="size-5 text-violet-500 dark:text-violet-400" />
+                  </div>
+                  <p className="text-sm font-medium">No tags yet</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    Use tags to categorize conversations — by topic, priority,
+                    sentiment, or anything else your team needs.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 gap-1.5"
+                    onClick={openCreateTagDialog}
+                  >
+                    <Plus className="size-3.5" />
+                    Create your first tag
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {orgTags.map((t) => (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        "group inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
+                        tagBadgeClass(t.color)
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "size-2 rounded-full",
+                          tagDotClass(t.color)
+                        )}
+                      />
+                      <span className="font-medium">{t.name}</span>
+                      <span className="opacity-70 tabular-nums">
+                        {t.conversations}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 ml-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openEditTagDialog(t)}
+                          className="rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+                          aria-label={`Edit ${t.name}`}
+                          title="Edit"
+                        >
+                          <Pencil className="size-3" />
+                        </button>
+                        <button
+                          onClick={() => setTagDeleteId(t.id)}
+                          className="rounded p-0.5 hover:bg-rose-500/20 hover:text-rose-700 dark:hover:text-rose-300"
+                          aria-label={`Delete ${t.name}`}
+                          title="Delete"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Split pane */}
         <div className="flex flex-1 min-h-0 gap-4">
@@ -1323,7 +1696,7 @@ export default function ConversationsPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm truncate">
                             {detail.visitorName ||
                               detail.visitorEmail ||
@@ -1338,6 +1711,102 @@ export default function ConversationsPage() {
                           >
                             {statusLabel(detail.status)}
                           </Badge>
+                          {detail.tags.map((t) => (
+                            <Badge
+                              key={t.id}
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] px-1.5 py-0 h-4 gap-1",
+                                tagBadgeClass(t.color)
+                              )}
+                              title={t.name}
+                            >
+                              <Hash className="size-2.5" />
+                              {t.name}
+                            </Badge>
+                          ))}
+                          {/* Add tag dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground gap-1"
+                              >
+                                <TagIcon className="size-3" />
+                                <span className="hidden sm:inline">Add tag</span>
+                                <Plus className="size-2.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-60">
+                              <DropdownMenuLabel className="text-xs flex items-center gap-1.5">
+                                <TagIcon className="size-3.5" />
+                                Tags
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <div className="max-h-60 overflow-y-auto scroll-thin">
+                                {orgTags.length === 0 ? (
+                                  <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                                    No tags yet.
+                                    <br />
+                                    Create one to get started.
+                                  </div>
+                                ) : (
+                                  orgTags.map((t) => {
+                                    const attached = detail.tags.some(
+                                      (ct) => ct.id === t.id
+                                    );
+                                    return (
+                                      <DropdownMenuCheckboxItem
+                                        key={t.id}
+                                        checked={attached}
+                                        disabled={tagTogglingId === t.id}
+                                        onCheckedChange={() =>
+                                          void toggleConversationTag(
+                                            t.id,
+                                            attached
+                                          )
+                                        }
+                                        onSelect={(e) => e.preventDefault()}
+                                        className="text-xs gap-2"
+                                      >
+                                        <span
+                                          className={cn(
+                                            "size-2.5 rounded-full shrink-0",
+                                            tagDotClass(t.color)
+                                          )}
+                                        />
+                                        <span className="truncate flex-1">
+                                          {t.name}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {t.conversations}
+                                        </span>
+                                      </DropdownMenuCheckboxItem>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setTagsPanelOpen(true);
+                                  openCreateTagDialog();
+                                }}
+                                className="text-xs gap-2"
+                              >
+                                <Plus className="size-3.5" />
+                                Create new tag
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setTagsPanelOpen(true)}
+                                className="text-xs gap-2"
+                              >
+                                <Settings2 className="size-3.5" />
+                                Manage tags
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {detail.visitorEmail || detail.visitorId}
@@ -2191,6 +2660,131 @@ export default function ConversationsPage() {
                   if (selectedId && ids.includes(selectedId)) {
                     setSelectedId(null);
                   }
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Tag create/edit dialog */}
+        <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <TagIcon className="size-4 text-violet-500" />
+                {tagDialogMode === "edit" ? "Edit tag" : "Create tag"}
+              </DialogTitle>
+              <DialogDescription>
+                {tagDialogMode === "edit"
+                  ? "Update the name or color of this tag."
+                  : "Add a new tag to categorize your conversations."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="tag-name" className="text-xs">Name</Label>
+                <Input
+                  id="tag-name"
+                  value={tagDialogName}
+                  onChange={(e) => setTagDialogName(e.target.value)}
+                  placeholder="e.g. VIP, Refund, Bug, Sales"
+                  maxLength={40}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void saveTag();
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Color</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {TAG_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setTagDialogColor(c)}
+                      className={cn(
+                        "size-8 rounded-full flex items-center justify-center ring-2 ring-offset-2 ring-offset-background transition-all",
+                        tagDotClass(c),
+                        tagDialogColor === c
+                          ? "ring-foreground"
+                          : "ring-transparent hover:ring-muted-foreground/40"
+                      )}
+                      aria-label={c}
+                      title={c}
+                    >
+                      {tagDialogColor === c && (
+                        <Check className="size-4 text-white" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Preview */}
+              <div className="space-y-2">
+                <Label className="text-xs">Preview</Label>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs px-2 py-0.5 h-5 gap-1",
+                      tagBadgeClass(tagDialogColor)
+                    )}
+                  >
+                    <Hash className="size-3" />
+                    {tagDialogName.trim() || "Tag name"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setTagDialogOpen(false)}
+                disabled={tagSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void saveTag()}
+                disabled={tagSaving || !tagDialogName.trim()}
+                className="gap-1.5"
+              >
+                {tagSaving ? (
+                  <Clock className="size-3.5 animate-spin" />
+                ) : (
+                  <Check className="size-3.5" />
+                )}
+                {tagDialogMode === "edit" ? "Save changes" : "Create tag"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Tag delete confirmation */}
+        <AlertDialog
+          open={!!tagDeleteId}
+          onOpenChange={(o) => !o && setTagDeleteId(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this tag?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The tag will be removed from all conversations it&apos;s
+                currently attached to. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (tagDeleteId) void deleteTag(tagDeleteId);
                 }}
               >
                 Delete

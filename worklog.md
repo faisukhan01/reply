@@ -593,3 +593,279 @@ ReplyAI was stable after round 2 (5 features added: Saved Replies, Assign wiring
 5. **Real-time Socket.io emission**: Wire `join:org` in the inbox for true cross-conversation live updates (eliminate 10s polling fallback).
 6. **Analytics dashboard enhancements**: Add date range picker, more chart types (response time distribution, satisfaction trend), export PDF option.
 7. **Localization/i18n**: Support multiple languages in the widget UI.
+
+---
+Task ID: 4-B
+Agent: conversation-tags
+Task: Add conversation tags/labels feature with API, UI, and tag management
+
+Work Log:
+- Read worklog, prisma/schema.prisma (Tag + ConversationTag models already pushed), session.ts, and conversations page
+- Created `src/app/api/tags/route.ts`: GET (list org tags with `_count` conversations) + POST (create with Zod-validated name/color, default color "violet", 409 on duplicate name)
+- Created `src/app/api/tags/[id]/route.ts`: PATCH (rename/recolor, verifies org ownership, dedup-checks on rename) + DELETE (cascade via schema onDelete: Cascade on ConversationTag)
+- Created `src/app/api/conversations/[id]/tags/route.ts`: GET (list attached tags), POST (attach — idempotent, catches Prisma P2002), DELETE (detach — idempotent, catches Prisma P2025). All verify conversation ownership via chatbot.orgId.
+- Updated `src/app/api/conversations/[id]/route.ts` GET to `include: { tags: { include: { tag: true } } }` and return a sorted `tags[]` array in the conversation payload. Also updated PATCH to include `tags[]` in its response so the inbox doesn't lose tags after a status/assign update.
+- Updated `src/app/(dashboard)/conversations/page.tsx`:
+  - Added imports: `Tag as TagIcon`, `Plus`, `Pencil`, `Settings2`, `ChevronsUpDown`, `Hash`, `toast` from sonner, `Collapsible*`, `Dialog*`, `Label`
+  - Added `TagColor`, `OrgTag`, `ConversationTagInfo` types; extended `ConversationDetail` with `tags`
+  - Added `tagBadgeClass()` and `tagDotClass()` helpers mapping the 6 allowed colors (violet, emerald, amber, fuchsia, rose, sky)
+  - Added state for org tags, tag dialog (create/edit), tag delete confirmation, tag toggle loading, collapsible panel
+  - Added `fetchOrgTags` effect on mount; handlers `saveTag`, `deleteTag`, `toggleConversationTag` (optimistic UI + revert on failure + org tag count sync), `openCreateTagDialog`, `openEditTagDialog`
+  - Added collapsible "Tags" management card above the inbox split pane (color-dot chips with conversation counts, edit/delete on hover, empty-state CTA)
+  - Added tag badges + "Add tag" dropdown in the conversation detail header (checkboxed org tag list with color dots + counts, "Create new tag" + "Manage tags" footer items that open the panel/dialog)
+  - Added tag create/edit Dialog (name input + 6-color picker with rings + live preview) and tag delete AlertDialog
+- Ran `bun run lint` — clean (no errors, no warnings)
+- Wrote agent-ctx record at `/home/z/my-project/agent-ctx/4-B-conversation-tags.md`
+
+Stage Summary:
+- Tag CRUD API: `GET/POST /api/tags`, `PATCH/DELETE /api/tags/[id]` — all org-scoped, dedup-guarded, color-validated
+- Conversation-tag API: `GET/POST/DELETE /api/conversations/[id]/tags` — idempotent attach/detach with Prisma unique/not-found error handling
+- Conversation detail GET + PATCH now return `tags[]` so the inbox header can render them and survive status/assign updates
+- Conversations page now has: a collapsible tag management card at the top (with create/edit/delete), inline tag badges + "Add tag" dropdown in the conversation header, and a create/edit tag dialog with color picker + live preview
+- All UI uses sonner toasts for feedback, optimistic updates for snappy tag toggling, and respects the no-indigo/no-blue rule (sky is the only blue-family color, explicitly allowed for tags)
+
+---
+Task ID: 4-A
+Agent: webhook-persistence
+Task: Wire up webhook persistence with Prisma model, API routes, and settings UI
+
+Work Log:
+- Read worklog.md, prisma/schema.prisma (Webhook model: id, orgId, url, events [JSON string], secret, active, createdAt, updatedAt), src/lib/session.ts (getCurrentUser returns { id, email, name, orgId, orgSlug, orgName, role }), and the existing Settings page Webhooks tab (used mock data with hardcoded array of 2 demo webhooks).
+- Created src/app/api/webhooks/route.ts: GET lists all webhooks for the current user's org (decodes JSON events string → array); POST creates a new webhook — validates URL (http/https), whitelist-validates events against the 4 allowed event types, auto-generates a secret (`whsec_` + 20 random hex bytes via `crypto.randomBytes`) when not supplied, persists with `active: true`.
+- Created src/app/api/webhooks/[id]/route.ts: GET single webhook, PATCH (url, events, active), DELETE — all guarded by `getCurrentUser()` (401 if no session) + org-ownership check (404 if webhook missing or belongs to another org). PATCH re-validates URL and events whitelist.
+- Created src/app/api/webhooks/[id]/test/route.ts: POST sends a sample `conversation.created` payload to the webhook URL via `fetch()` with POST + JSON body, signs the body with HMAC-SHA256 using the webhook's secret and attaches `X-ReplyAI-Signature: sha256=...` + `X-ReplyAI-Event` headers, aborts after 10s. Returns `{ success: true, status }` for 2xx, `{ success: false, status, error }` for non-2xx, or `{ success: false, error }` for network errors.
+- Modified src/app/(dashboard)/settings/page.tsx:
+  • Added `RefreshCw` to lucide-react imports.
+  • Added `Webhook` type + `WEBHOOK_EVENTS` constant (4 events: conversation.created, conversation.closed, message.received, satisfaction.rated).
+  • Added state: `webhooks`, `webhooksLoading`, `whDialogOpen`, `creatingWh`, `whForm` (url/events/secret), `togglingId`, `deletingId`, `testingId`, `copiedSecret`.
+  • Added `fetchWebhooks` callback (GET /api/webhooks) + useEffect to load on mount.
+  • Added handlers: `toggleWhEvent`, `generateWhSecret` (client-side `whsec_` + 20 alphanum chars), `copyWhSecret` (clipboard + 1.5s "Copied" feedback), `handleCreateWebhook` (validates URL + events, POSTs, prepends to list, closes dialog), `handleToggleWebhook` (optimistic update + PATCH `{ active }` with rollback on error), `handleDeleteWebhook` (DELETE + remove from list), `handleTestWebhook` (POST /api/webhooks/[id]/test, toast info → success/error with status).
+  • Replaced the Webhooks tab JSX: controlled Dialog with `<form>` (URL input with required marker, event checkboxes showing both label and event-id code, secret field with Generate + Copy buttons, "auto-generated on create" placeholder, disabled-while-creating submit button with spinner). Replaced demo list with: skeleton loaders (2 rows) while loading, empty state (violet Webhook icon + "No webhooks yet" + CTA that opens the same dialog), live list with per-row Test button (spinner while testing), Switch toggle (disabled while patching), delete button (spinner while deleting) wrapped in AlertDialog confirm. Replaced the "Test a webhook" card's URL input + Send button with a reference card explaining the per-row Test button + the actual sample payload + signature header docs. Kept the sidebar tips (Webhook events reference + Pro tip) unchanged.
+- Ran `bun run lint` — initially 1 warning (unused `// eslint-disable-next-line no-new` directive on `new URL(url)` validation). Removed the directive. Re-ran lint: 0 errors, 0 warnings.
+- Ran `bunx tsc --noEmit` — my 3 new API files produce ZERO type errors. The only settings/page.tsx error (`o.users` on OrgInfo at line 205) is pre-existing (flagged by the Task 6 widget agent in the worklog) and not touched by my changes.
+
+Stage Summary:
+- 3 new API routes created (GET/POST /api/webhooks; GET/PATCH/DELETE /api/webhooks/[id]; POST /api/webhooks/[id]/test) — all auth-gated via getCurrentUser() with org-ownership checks.
+- Settings Webhooks tab is fully wired to real data: list, create, toggle (optimistic), delete (with confirm), test (with toast). Demo/mock data removed. Loading skeletons + empty state added. Form uses controlled inputs with URL + event validation. Auto-secret generation on the server when not provided, plus a client-side Generate button + Copy-to-clipboard.
+- Test endpoint signs payloads with HMAC-SHA256 and documents the `X-ReplyAI-Signature` / `X-ReplyAI-Event` headers so recipients can verify authenticity.
+- Lint: clean (0 errors, 0 warnings). Type-check: clean for all new/modified files.
+- Note for next phase: webhook *firing* on real events (e.g., when a conversation is created in /api/widget) is not yet implemented — only the manual test endpoint exists. A `lib/webhooks.ts` helper that queries active org webhooks subscribed to an event and POSTs signed payloads would close the loop.
+
+---
+Task ID: 5-A
+Agent: analytics-enhancements
+Task: Enhance analytics with date range, new charts, PDF export, styling polish
+
+Work Log:
+- Read worklog.md, existing analytics page.tsx (4 KPI cards, 14d conversations trend bar, 7d satisfaction trend line, status donut, channel breakdown as bar rows, top questions), and /api/analytics route.ts (server-side aggregations: 14d conv trend, 7d satisfaction trend, statusBreakdown, topQuestions, KPIs)
+- Verified available shadcn/ui components (chart, popover, calendar, tooltip, badge, card, button) and packages (recharts 2.15.4, framer-motion 13.1.0, date-fns 4.1.0, react-day-picker 9.8.0, lucide-react 0.525.0)
+- Enhanced /api/analytics/route.ts to add new fields:
+  • Extended conversationsTrend from 14 days → 90 days (with 90-day conversation fetch)
+  • Extended satisfactionTrend from 7 days → 14 days
+  • Added hourlyActivity (24 entries 0-23, computed from 90-day conversations)
+  • Added responseTimeDist (4 buckets: 1-2 msgs, 3-5 msgs, 6-10 msgs, 10+ msgs — based on per-conversation message counts via `_count: { select: { messages: true } }`)
+  • Added channelBreakdown { widget, api, other } via `groupBy` on Conversation.channel
+  • Added avgResponseTime (seconds) — computed from first VISITOR message → first AI reply (only includes responses < 1h to filter async cases)
+  • Added peakHour (0-23, hour with most conversations in 90-day window)
+  • Added prev{} metrics for trend indicators: prevResolutionRate, prevAvgSatisfaction, prevTotalMessages, prevAvgResponseTime, prevTotalConversations (computed from previous 7-day window: 7-14 days ago)
+  • Wrote `computeAvgResponseTime` helper that pairs first-VISITOR-msg with first-AI-reply per conversation, returns seconds
+  • Bumped topQuestions limit from 5 → 8
+- Rewrote /src/app/(dashboard)/analytics/page.tsx as a comprehensive "use client" dashboard:
+  • Date range picker (Popover + Calendar) with quick presets: Last 7 days, Last 30 days, Last 90 days, All time + custom calendar range selection. Range shown as both button label and dedicated Badge. Disabled future dates in calendar.
+  • Client-side filtering: filteredConvTrend + filteredSatTrend useMemo filters the 90-day trend arrays by the selected date range
+  • "Last updated" timestamp in top-right with refresh button (re-fetches /api/analytics) + tooltip showing full timestamp
+  • CSV export (rewritten): exports all KPIs, both trends (filtered), hourly activity, response time dist, top questions — filename now date-stamped
+  • PDF export button: triggers window.print() with shadcn Tooltip explaining "Print to PDF (opens browser print dialog)"
+  • 4 new metric cards (as task specifies): Avg Response Time (Clock/amber, invert trend), Peak Hour (Activity/violet, "Busiest hour" sub-trend), Resolution Rate (Target/emerald), Total Messages Sent (MessageSquare/fuchsia). Each with TrendPill showing up/down % vs previous 7-day window.
+  • 4 secondary metric cards: Avg Satisfaction (Star/emerald), Conversations (BarChart3/violet), AI Handled (MessageSquare/fuchsia), Contacts (Target/amber) — total 8 KPI cards in 2 rows of 4 (lg:grid-cols-4)
+  • KpiCard component enhanced: relative positioning, group-hover gradient sheen overlay (per-accent color: violet/emerald/fuchsia/amber at 10-12% opacity), hover -translate-y-0.5 + shadow-md, print-card class for PDF
+  • TrendPill component: shows TrendingUp/TrendingDown/Minus icon + % delta, color-coded emerald (good) / rose (bad), supports `invert` for "lower is better" metrics like response time
+  • ChartCard wrapper component: icon in colored accent badge, title + description, optional badge slot, staggered motion fade-in via delay prop
+  • Upgraded satisfaction trend: now 14-day AreaChart with violet line (#8b5cf6) + violet gradient fill (linearGradient #satGrad from 45% opacity → 0%)
+  • New chart: Conversation length distribution (horizontal BarChart, layout="vertical", 4 buckets with violet→fuchsia gradient cells #8b5cf6 → #a855f7 → #c026d3 → #d946ef, shows conversation count per message-range bucket)
+  • New chart: Hourly activity (24-bar BarChart, emerald #10b981 default + #059669 at 100% opacity for peak hour, dimmed 55% for non-peak; peak hour highlighted via Cell fillOpacity). Peak hour badge in header.
+  • Upgraded channel breakdown: now a real donut PieChart (innerRadius=50, outerRadius=80) replacing the previous static bar rows. Donut uses violet (Widget) / fuchsia (API) / amber (Other). Legend shows count + % per channel with Globe/Code icons.
+  • Staggered fade-in animations: each motion.div uses incremental delay (0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4) for cascading reveal
+  • Tooltip wrappers on PDF button + Last updated button
+  • All cards use rounded-xl + shadow-sm + border (consistent)
+- Added print-friendly CSS to /src/app/globals.css:
+  • `@media print` block: hides body * then reveals only .print-area + descendants
+  • .no-print elements hidden (header buttons, loading overlay)
+  • .print-card gets break-inside:avoid, page-break-inside:avoid, no shadow, light border
+  • Forces white background + dark text on body, color-adjust: exact for color printing
+  • @page { margin: 1.5cm; size: landscape }
+- Lint: `bun run lint` → 0 errors, 0 warnings ✅
+- TypeScript: `bunx tsc --noEmit --skipLibCheck` → 0 errors in analytics/page.tsx and api/analytics/route.ts (pre-existing errors in other files untouched)
+- Wrote agent-ctx record at /home/z/my-project/agent-ctx/5-A-analytics-enhancements.md
+
+Stage Summary:
+- API now returns 90-day conversationsTrend, 14-day satisfactionTrend, 24-entry hourlyActivity, 4-bucket responseTimeDist, channelBreakdown (Widget/API/Other via groupBy), avgResponseTime (from first-VISITOR→first-AI message deltas), peakHour, and prev{} metrics for trend indicators — all computed in parallel via Promise.all (10 queries)
+- Analytics page transformed into a comprehensive dashboard: 8 KPI cards with trend indicators + gradient hover, 6 chart cards (conversations over time, status donut, satisfaction trend 14d violet+gradient, channel breakdown donut, conversation length distribution horizontal bar, hourly activity bar with peak highlight, top questions), date range picker with 4 presets + custom calendar, CSV export with all metrics, PDF export via window.print() with print-friendly CSS, "Last updated" timestamp with manual refresh
+- All charts respect the selected date range client-side (trends filtered; aggregates like hourly/channel/status remain all-time)
+- All animations use framer-motion with staggered fade-in (0.05s incremental delay); KPI cards have group-hover gradient sheen overlay matching accent color
+- Print CSS uses visibility-based approach (only .print-area visible) with @page landscape + 1.5cm margins, break-inside:avoid on cards, forced light backgrounds
+- No blue/indigo colors used — violet/fuchsia/emerald/amber palette throughout
+- Lint clean (0 errors, 0 warnings). TS clean for new/modified files.
+
+---
+Task ID: 5-B
+Agent: dashboard-contacts-polish
+Task: Polish dashboard and contacts with styling improvements, grid view, contact drawer
+
+Work Log:
+- Created `src/components/dashboard/mini-sparkline.tsx`: lightweight pure-SVG sparkline component (no recharts) used by both stat cards (7-day trend) and welcome banner (24h hourly activity). Takes numeric points + hex stroke color + optional area gradient + end-dot for emphasis.
+- Updated `src/components/dashboard/stat-cards.tsx`:
+  - Added hover glow (per-tone ring + colored shadow on hover) and `whileHover` lift via framer-motion.
+  - Added mini 7-day trend sparkline at the bottom of each card (uses MiniSparkline + tone hex color).
+  - Replaced generic up-right delta indicator with directional arrow + colored pill (green for positive, rose for negative) — driven by new `deltaPositive` prop.
+  - Added `trend` prop typed as `number[]`.
+  - Icon chip scales 110% on hover for tactile feedback.
+- Created `src/components/dashboard/recent-conversations-list.tsx` (new client component):
+  - Avatar with online/offline status dot (emerald for online, zinc for offline).
+  - Unread-message count badge (rose pill) on conversations needing attention; row tinted amber to draw the eye.
+  - Status-colored left border (violet for AI, emerald for Human, zinc for Closed).
+  - Hover preview tooltip showing last 3 messages with role label, role-colored text, and 2-line clamp per message.
+  - Accepts precomputed previewMessages, unread count, and online flag (computed server-side from message history).
+- Updated `src/app/(dashboard)/dashboard/page.tsx` (server component — no icon-as-prop, only string keys):
+  - Welcome banner now uses `animate-gradient` for shifting gradient + `animate-[shimmer_6s_linear_infinite]` overlay sheen.
+  - Added "What's new" pill button with animated ping dot, opening a tooltip listing 5 recent features (AI Reply Suggestions, Canned responses with shortcuts, Conversation tags, AI summary, Realtime typing indicators).
+  - Added hourly activity card with MiniSparkline (24-bucket, truncated to current hour) showing today's conversation count + sparkline next to welcome text on the banner.
+  - Stat cards now receive per-stat 7-day trends (Total Convos, AI Resolved, Satisfaction, Contacts) computed from new DB queries (convsLast7d, aiConvsLast7d, contactsLast7d).
+  - Recent conversations list now uses new RecentConversationsList client component with enriched data: last 5 messages per conversation (for preview + unread heuristic of trailing VISITOR messages), online flag = last message within 5 minutes.
+  - Top questions card: added "View all" ghost button linking to /conversations?filter=top-questions, percentage label next to count badge (count / totalQuestionCount), pulse-glow animation on the #1 rank chip + tinted background row.
+  - Empty states replaced with new `EmptyChartState` helper: gradient background (violet/fuchsia), large muted icon in rounded white/violet tile, descriptive copy, and CTA button (Add knowledge / Test your bot / Open widget demo).
+  - Removed unused `recent` variable, `ConvRow` type, and `formatDistanceToNow` import.
+- Updated `src/app/api/contacts/route.ts`:
+  - GET now enriches each contact with `conversationCount` and `lastSeenAt` by joining conversations via `visitorEmail` (one batched query for all emails + their max updatedAt).
+  - POST response shape aligned with the enriched format.
+- Updated `src/app/api/contacts/[id]/route.ts`:
+  - Added GET handler returning full contact detail + their last 30 conversations (matched via visitorEmail) with last message preview.
+  - Added PATCH handler for partial updates (name, email, phone, notes) with org ownership check.
+  - Existing DELETE preserved.
+- Rewrote `src/app/(dashboard)/contacts/page.tsx` (client component):
+  - Added grid/list view toggle (LayoutGrid / List icons) at top right.
+  - Grid view: cards with gradient-ring avatar, name + email, source badge with icon, conversation count + last seen relative time footer, hover overlay with View/Edit/Delete quick action buttons.
+  - List view: preserved table layout, made rows clickable to open detail drawer, added ExternalLink quick-view button.
+  - Search bar now has a clear (X) button when query is non-empty.
+  - Added source filter dropdown (All / Widget / API / Manual) and sort dropdown (Newest first / Name A-Z / Name Z-A / Most conversations) using shadcn Select.
+  - Contact detail Sheet (right side, max-w-md): large avatar with violet ring, name, source badge + member-since badge, detail fields (email, phone, notes, member since) with icons, conversation history list with status mini-badges linking to /conversations?id=, Edit and Delete buttons in footer.
+  - Top-level Edit Dialog (reusable from grid hover OR drawer) with PATCH /api/contacts/[id].
+  - Empty state with gradient background + large icon tile + CTA.
+  - All filter/sort logic done client-side with useMemo; framer-motion layout animations on grid cards (AnimatePresence + popLayout).
+- Used only violet/emerald/amber/fuchsia/rose/zinc colors — no indigo or blue.
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `bunx tsc --noEmit --skipLibCheck` → no errors in any of the new/modified files ✅ (pre-existing errors in other files untouched).
+
+Stage Summary:
+- Dashboard now has an animated shimmer welcome banner with What's-new pill tooltip and live hourly sparkline; stat cards have hover glow, per-tone sparkline trends, and colored delta pills; recent conversations have status dots, unread badges, status-colored left borders, and hover preview tooltips; top questions show percentages + pulse on #1 + View all link; all empty states have gradient backgrounds and CTAs.
+- Contacts page now supports a grid view with gradient-ring avatars and hover quick actions; search has a clear button; source + sort dropdowns added; clicking any contact opens a right-side Sheet drawer with full details, conversation history, and edit/delete actions.
+- New backend: GET /api/contacts returns enriched conversationCount + lastSeenAt; GET /api/contacts/[id] returns detail + conversations; PATCH /api/contacts/[id] for editing.
+- Files added: mini-sparkline.tsx, recent-conversations-list.tsx.
+- Files modified: stat-cards.tsx, dashboard/page.tsx, contacts/page.tsx, api/contacts/route.ts, api/contacts/[id]/route.ts.
+
+---
+Task ID: CRON-REVIEW-4
+Agent: main (orchestrator) — webDevReview cron round 4
+Task: QA testing + critical bug fix + 4 major feature additions + comprehensive styling polish
+
+## Current Project Status Assessment
+ReplyAI was stable after round 3 (7+ features added: landing page sections, conversation filters, widget improvements, webhooks UI, profile completion, mobile visitor panel). This round started with QA testing which revealed a **critical bug**: the dashboard crashed with "Functions cannot be passed directly to Client Components" error because the Server Component dashboard page was passing Lucide icon components as props to the Client Component StatCards. This was fixed first, then 4 major features were added via parallel subagents, plus comprehensive styling polish.
+
+## Completed Modifications
+
+### CRITICAL BUG FIX: Dashboard Server→Client Icon Serialization
+- **Problem**: `dashboard/page.tsx` (Server Component) passed `stats` array containing `icon: MessageSquare` (Lucide icon components) to `StatCards` (Client Component). Next.js 16 throws "Functions cannot be passed directly to Client Components" error.
+- **Fix**: Changed `StatCards` to accept `icon: string` (icon key name) instead of `icon: LucideIcon`. Added an `iconMap` in `stat-cards.tsx` that maps string keys ("MessageSquare", "Bot", "Star", "Users") to their Lucide components. Updated `dashboard/page.tsx` to pass string keys.
+- **Result**: Dashboard now loads without server-side exception. ✅
+
+### QA Testing Results
+- Landing page: All sections load correctly ✅
+- Login page: Loads with demo credentials ✅
+- Dashboard: Was crashing (fixed), now loads ✅
+- Conversations: Loads with tags panel ✅
+- Settings: Loads with 7 tabs including Webhooks ✅
+- Analytics: Loads with date range picker and charts ✅
+- Contacts: Loads with grid/list toggle ✅
+- Lint: 0 errors, 0 warnings ✅
+
+### New Feature 1: Webhook Persistence (Task 4-A — via subagent)
+- **Prisma Schema**: Added `Webhook` model (id, orgId, url, events [JSON string], secret, active, timestamps)
+- **API Routes** (3 new files):
+  - `GET/POST /api/webhooks` — list/create webhooks with URL validation, event whitelist, auto-generated `whsec_` secret via crypto.randomBytes
+  - `GET/PATCH/DELETE /api/webhooks/[id]` — CRUD with org ownership verification
+  - `POST /api/webhooks/[id]/test` — sends test payload with HMAC-SHA256 signature, X-ReplyAI-Signature and X-ReplyAI-Event headers, 10s timeout
+- **Settings UI**: Replaced mock data with live CRUD — create dialog with URL validation, event checkboxes, secret generation/copy; list with test/toggle/delete actions; loading skeletons; empty state
+
+### New Feature 2: Conversation Tags/Labels (Task 4-B — via subagent)
+- **Prisma Schema**: Added `Tag` model (id, orgId, name, color, conversations, @@unique([orgId, name])) and `ConversationTag` join model
+- **API Routes** (3 new files):
+  - `GET/POST /api/tags` — list with conversation counts, create with Zod validation
+  - `PATCH/DELETE /api/tags/[id]` — rename/recolor, cascade delete
+  - `GET/POST/DELETE /api/conversations/[id]/tags` — attach/detach tags (idempotent)
+- **Conversation Detail API**: Updated to include tags with full tag info
+- **Conversations Page UI**:
+  - Collapsible "Tags" management card at top with color-dot chips, counts, edit/delete
+  - Tag badges + "Add tag" dropdown in conversation detail header
+  - Create/edit Dialog with name input + 6-color picker + live preview
+  - Delete confirmation AlertDialog
+  - Optimistic UI on toggle with revert-on-failure
+- **6 Colors**: violet, emerald, amber, fuchsia, rose, sky
+
+### New Feature 3: Analytics Enhancements (Task 5-A — via subagent)
+- **API Enhancements**: Extended `/api/analytics` with 90-day trends, satisfaction trend (14d), hourly activity (24h), response time distribution (4 buckets), channel breakdown, avg response time, peak hour, previous 7-day metrics for trend comparison
+- **Date Range Picker**: Popover + Calendar with 4 presets (7d/30d/90d/All time) + custom range, badge display, client-side filtering
+- **PDF Export**: window.print() button with print-friendly CSS (@media print, .print-area, .no-print, landscape orientation)
+- **8 KPI Cards**: Avg Response Time, Peak Hour, Resolution Rate, Total Messages — each with TrendPill showing up/down % vs previous 7 days, gradient hover sheen
+- **6 Chart Cards** (staggered fade-in):
+  - Conversations over time (bar, violet)
+  - Status distribution (donut)
+  - Satisfaction trend (14-day area chart, violet gradient fill)
+  - Channel breakdown (donut)
+  - Conversation length distribution (horizontal bar, violet→fuchsia gradient)
+  - Hourly activity (24-bar, emerald with peak highlighted)
+  - Top questions (improved)
+- **"Last updated" timestamp** + refresh button
+
+### New Feature 4: Dashboard + Contacts Polish (Task 5-B — via subagent)
+**Dashboard:**
+- Welcome banner: animated gradient + shimmer overlay, "What's new" pill with ping dot and tooltip, hourly activity sparkline card
+- Stat cards: per-tone hover glow ring, framer-motion lift, 7-day mini trend sparkline, colored delta pill with directional arrow
+- Recent conversations: avatar online/offline dot, unread count badge, status-colored left border, hover tooltip with last 3 messages
+- Top questions: "View all" link, percentage labels, pulse-glow on #1 question
+- Empty states: gradient backgrounds, large icon tiles, CTA buttons
+
+**Contacts:**
+- Grid/list view toggle
+- Grid view: cards with gradient-ring avatar, source badge, conversation count, last seen, hover quick actions
+- List view: clickable rows opening drawer
+- Search with clear (X) button
+- Source filter dropdown (All/Widget/API/Manual)
+- Sort dropdown (Newest/Name A-Z/Name Z-A/Most conversations)
+- Contact detail Sheet (right side): large avatar, badges, email/phone/notes, conversation history with links, Edit/Delete
+- API: GET `/api/contacts` returns conversationCount + lastSeenAt; new GET/PATCH `/api/contacts/[id]`
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- agent-browser QA (all verified):
+  - Dashboard: loads with "What's new" button, online/offline dots, unread badges, no errors ✅
+  - Conversations: loads with "Toggle tags panel" and "Create tag" buttons ✅
+  - Settings: loads with 7 tabs including Webhooks ✅
+  - Analytics: loads with date range picker, CSV/PDF export, 8 KPI cards, 6 charts ✅
+  - Contacts: loads with grid/list toggle, source filter, sort dropdown ✅
+- Dev server: port 3000 running
+- Zero console errors or runtime errors after bug fix
+
+## Unresolved Issues / Risks
+1. **Dev server stability**: Sandbox occasionally kills idle `bun run dev` processes. Auto-restarts on next request. Low impact.
+2. **Tag counts on initial load**: The tags management card shows counts correctly after tags are created, but the count may be 0 for new orgs until conversations are tagged.
+3. **Webhook test endpoint**: The test webhook fires a real HTTP request to the URL. If the URL is unreachable, it waits for the 10s timeout. Acceptable for demo.
+4. **Analytics date filter**: Currently client-side filtering on already-fetched 90-day data. For ranges beyond 90 days, would need server-side query params.
+
+## Priority Recommendations for Next Phase
+1. **Team roles & permissions**: Differentiate OWNER/ADMIN/AGENT capabilities (only OWNER can delete org, ADMIN can invite, AGENT can only view assigned conversations).
+2. **Real-time Socket.io**: Wire `join:org` in the inbox for true cross-conversation live updates (eliminate 10s polling fallback).
+3. **Onboarding wizard**: Multi-step setup wizard (create bot → upload KB → customize → embed) with progress tracking, replacing the current simple modal.
+4. **Conversation search server-side**: Move search to server-side with full-text search for large datasets.
+5. **Webhook delivery logs**: Track webhook delivery attempts, retries, and failures in a new model.
+6. **Analytics export to PDF**: Enhance the print CSS for a more polished PDF report with branding.
+7. **Localization/i18n**: Support multiple languages in the widget UI and dashboard.

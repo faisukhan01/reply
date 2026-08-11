@@ -364,3 +364,49 @@
   animation: cta-border-rotate 6s ease infinite;
   z-index: -1;
 }
+
+/* ─── Print styles for PDF export (analytics page) ─────────────── */
+@media print {
+  /* Hide everything except the print container */
+  body * {
+    visibility: hidden !important;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+  .print-area {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0 !important;
+  }
+  /* Hide elements marked as no-print */
+  .no-print {
+    display: none !important;
+  }
+  /* Reset page background and ensure good contrast */
+  html, body {
+    background: #ffffff !important;
+    color: #0a0a0a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Avoid breaking inside chart cards */
+  .print-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #e5e5e5 !important;
+  }
+  /* Force light backgrounds for cards */
+  .print-card,
+  .print-card * {
+    color: #0a0a0a !important;
+  }
+  @page {
+    margin: 1.5cm;
+    size: landscape;
+  }
+}
