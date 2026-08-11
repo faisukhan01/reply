@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { Sparkles, Bot, MessageSquare, BarChart3, Zap, Shield, Globe, Code2, ArrowRight, Check, Star, Wand2, Command } from "lucide-react";
+import { Sparkles, Bot, MessageSquare, BarChart3, Zap, Shield, Globe, Code2, ArrowRight, Check, Star, Wand2, Command, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Hero3D } from "@/components/three/hero-3d";
+import { FadeIn, StaggerContainer, StaggerItem, ScaleIn } from "@/components/landing/scroll-animations";
+import { AnimatedChatPreview } from "@/components/landing/animated-chat-preview";
+import { AnimatedCounter } from "@/components/landing/animated-counter";
 
 export const dynamic = "force-static";
 
@@ -47,10 +50,16 @@ const features = [
 ];
 
 const stats = [
-  { value: "24/7", label: "Always available" },
-  { value: "85%", label: "Avg. auto-resolution" },
-  { value: "<2s", label: "Response time" },
-  { value: "50+", label: "Languages" },
+  { value: "24/7", label: "Always available", prefix: "", suffix: "", animated: false },
+  { value: "85", label: "Avg. auto-resolution", prefix: "", suffix: "%", animated: true },
+  { value: "2", label: "Response time (secs)", prefix: "<", suffix: "s", animated: true },
+  { value: "50", label: "Languages", prefix: "", suffix: "+", animated: true },
+];
+
+const testimonials = [
+  { quote: "ReplyAI handles 80% of our support tickets automatically. Our team can finally focus on complex issues.", name: "Sarah Chen", role: "Head of Support, TechFlow", avatar: "SC" },
+  { quote: "Setup took 10 minutes. Within a week, our response time dropped from 4 hours to under 2 seconds.", name: "Marcus Williams", role: "CEO, ShipFast", avatar: "MW" },
+  { quote: "The AI actually understands our product. Customers can't tell they're chatting with a bot.", name: "Priya Sharma", role: "CX Lead, CloudNest", avatar: "PS" },
 ];
 
 const plans = [
@@ -145,45 +154,35 @@ export default function LandingPage() {
           <div className="relative h-[360px] md:h-[480px] lg:h-[520px]">
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-violet-500/10 via-fuchsia-500/5 to-transparent" />
             <Hero3D />
-            {/* Floating chat preview card */}
-            <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-80 rounded-2xl border bg-card/95 backdrop-blur shadow-2xl p-4 space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div className="text-sm font-semibold">ReplyAI Assistant</div>
-                <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Online
-                </span>
-              </div>
-              <div className="space-y-2 text-xs">
-                <div className="bg-muted rounded-lg rounded-tl-none px-3 py-2 max-w-[85%]">
-                  Hi! What are your business hours? 🕐
-                </div>
-                <div className="bg-violet-600 text-white rounded-lg rounded-tr-none px-3 py-2 max-w-[85%] ml-auto">
-                  We're open Mon–Fri, 9 AM to 6 PM. But I'm here 24/7 to help! 😊
-                </div>
-              </div>
+            {/* Animated chat preview card */}
+            <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-80">
+              <AnimatedChatPreview />
             </div>
           </div>
         </div>
       </section>
 
       {/* Stats */}
-      <section className="border-y bg-muted/30">
+      <FadeIn className="border-y bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
           {stats.map((s) => (
             <div key={s.label} className="text-center">
-              <div className="text-3xl md:text-4xl font-bold gradient-text">{s.value}</div>
+              <div className="text-3xl md:text-4xl font-bold gradient-text">
+                {s.animated ? (
+                  <AnimatedCounter target={s.value} prefix={s.prefix} suffix={s.suffix} />
+                ) : (
+                  s.value
+                )}
+              </div>
               <div className="text-sm text-muted-foreground mt-1">{s.label}</div>
             </div>
           ))}
         </div>
-      </section>
+      </FadeIn>
 
       {/* Features */}
       <section id="features" className="mx-auto max-w-7xl px-4 md:px-6 py-20">
-        <div className="text-center max-w-2xl mx-auto mb-14">
+        <FadeIn className="text-center max-w-2xl mx-auto mb-14">
           <Badge variant="secondary" className="mb-4">Features</Badge>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
             Everything you need to automate support
@@ -191,25 +190,59 @@ export default function LandingPage() {
           <p className="text-muted-foreground mt-4 text-lg">
             Stop losing customers to slow responses. ReplyAI handles the repetitive 80% so your team focuses on what matters.
           </p>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-6">
+        </FadeIn>
+        <StaggerContainer className="grid sm:grid-cols-2 gap-6">
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <Card key={f.title} className="p-6 hover:shadow-lg hover-lift transition-all group border-border/60">
-                <div className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${f.color} text-white mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-              </Card>
+              <StaggerItem key={f.title}>
+                <Card className="p-6 hover:shadow-lg hover-lift transition-all group border-border/60">
+                  <div className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${f.color} text-white mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                </Card>
+              </StaggerItem>
             );
           })}
-        </div>
+        </StaggerContainer>
+      </section>
+
+      {/* Testimonials */}
+      <section className="mx-auto max-w-7xl px-4 md:px-6 pb-20">
+        <FadeIn className="text-center max-w-2xl mx-auto mb-14">
+          <Badge variant="secondary" className="mb-4">Testimonials</Badge>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            Loved by support teams everywhere
+          </h2>
+          <p className="text-muted-foreground mt-4 text-lg">
+            Thousands of businesses trust ReplyAI to deliver instant, accurate customer support.
+          </p>
+        </FadeIn>
+        <StaggerContainer className="grid md:grid-cols-3 gap-6">
+          {testimonials.map((t) => (
+            <StaggerItem key={t.name}>
+              <Card className="p-6 relative hover:shadow-lg transition-all group">
+                <Quote className="absolute top-4 right-4 h-8 w-8 text-violet-500/10 group-hover:text-violet-500/20 transition-colors" />
+                <p className="text-sm text-muted-foreground leading-relaxed mb-6">&ldquo;{t.quote}&rdquo;</p>
+                <div className="flex items-center gap-3 mt-auto">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-bold">
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{t.name}</div>
+                    <div className="text-xs text-muted-foreground">{t.role}</div>
+                  </div>
+                </div>
+              </Card>
+            </StaggerItem>
+          ))}
+        </StaggerContainer>
       </section>
 
       {/* Extra trust strip */}
-      <section className="mx-auto max-w-7xl px-4 md:px-6 pb-20 grid md:grid-cols-3 gap-4">
+      <FadeIn className="mx-auto max-w-7xl px-4 md:px-6 pb-20 grid md:grid-cols-3 gap-4">
         {[
           { icon: Shield, title: "SOC 2 ready", desc: "Your data is encrypted & isolated per tenant." },
           { icon: Globe, title: "Multi-language", desc: "Detect & reply in 50+ languages automatically." },
@@ -217,7 +250,7 @@ export default function LandingPage() {
         ].map((t) => {
           const Icon = t.icon;
           return (
-            <div key={t.title} className="flex items-start gap-3 p-5 rounded-xl border bg-card">
+            <ScaleIn key={t.title} className="flex items-start gap-3 p-5 rounded-xl border bg-card">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 shrink-0">
                 <Icon className="h-5 w-5" />
               </div>
@@ -225,15 +258,15 @@ export default function LandingPage() {
                 <div className="font-semibold text-sm">{t.title}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{t.desc}</div>
               </div>
-            </div>
+            </ScaleIn>
           );
         })}
-      </section>
+      </FadeIn>
 
       {/* Pricing */}
       <section id="pricing" className="border-t bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-20">
-          <div className="text-center max-w-2xl mx-auto mb-14">
+          <FadeIn className="text-center max-w-2xl mx-auto mb-14">
             <Badge variant="secondary" className="mb-4">Pricing</Badge>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               Simple, transparent pricing
@@ -241,50 +274,51 @@ export default function LandingPage() {
             <p className="text-muted-foreground mt-4 text-lg">
               Start free. Upgrade when you grow. Cancel anytime.
             </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          </FadeIn>
+          <StaggerContainer className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {plans.map((p) => (
-              <Card
-                key={p.name}
-                className={`p-6 relative ${p.highlight ? "border-violet-500 shadow-xl shadow-violet-500/10 md:-translate-y-2" : ""}`}
-              >
-                {p.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-3 py-1 shadow-md">
-                      Most popular
-                    </Badge>
-                  </div>
-                )}
-                <div className="text-sm font-semibold text-muted-foreground">{p.name}</div>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{p.price}</span>
-                  <span className="text-muted-foreground">{p.period}</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">{p.desc}</p>
-                <Button
-                  className="w-full mt-5"
-                  variant={p.highlight ? "default" : "outline"}
-                  asChild
+              <StaggerItem key={p.name}>
+                <Card
+                  className={`p-6 relative hover:shadow-xl transition-all duration-300 group ${p.highlight ? "border-violet-500 shadow-xl shadow-violet-500/10 md:-translate-y-2" : "hover:border-violet-300"}`}
                 >
-                  <Link href="/signup">{p.cta}</Link>
-                </Button>
-                <ul className="mt-6 space-y-2.5">
-                  {p.features.map((feat) => (
-                    <li key={feat} className="flex items-start gap-2 text-sm">
-                      <Check className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                      <span className="text-muted-foreground">{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
+                  {p.highlight && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <Badge className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-3 py-1 shadow-md">
+                        Most popular
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="text-sm font-semibold text-muted-foreground">{p.name}</div>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold group-hover:scale-105 transition-transform origin-left">{p.price}</span>
+                    <span className="text-muted-foreground">{p.period}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">{p.desc}</p>
+                  <Button
+                    className="w-full mt-5"
+                    variant={p.highlight ? "default" : "outline"}
+                    asChild
+                  >
+                    <Link href="/signup">{p.cta}</Link>
+                  </Button>
+                  <ul className="mt-6 space-y-2.5">
+                    {p.features.map((feat) => (
+                      <li key={feat} className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                        <span className="text-muted-foreground">{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerContainer>
         </div>
       </section>
 
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 md:px-6 py-20">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 px-8 py-16 md:py-20 text-center text-white">
+        <FadeIn className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 px-8 py-16 md:py-20 text-center text-white">
           <div className="absolute inset-0 bg-grid opacity-20" />
           <div className="relative space-y-6">
             <div className="flex justify-center gap-1">
@@ -304,7 +338,7 @@ export default function LandingPage() {
               </Link>
             </Button>
           </div>
-        </div>
+        </FadeIn>
       </section>
 
       {/* Footer */}

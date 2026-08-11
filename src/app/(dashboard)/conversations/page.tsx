@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { formatDistanceToNow, format } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Send,
@@ -24,6 +25,11 @@ import {
   ChevronDown,
   Star,
   Download,
+  Inbox,
+  AlertTriangle,
+  UserCheck,
+  SquareCheck,
+  Square,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -190,7 +196,7 @@ function getSocket(): Socket {
 }
 
 // ─── Component ────────────────────────────────────────────────────
-type Tab = "ALL" | "AI" | "HUMAN" | "CLOSED";
+type Tab = "ALL" | "AI" | "HUMAN" | "CLOSED" | "NEEDS_ATTENTION";
 
 export default function ConversationsPage() {
   // List state
@@ -240,6 +246,18 @@ export default function ConversationsPage() {
 
   // Visitor info panel toggle
   const [showVisitorPanel, setShowVisitorPanel] = useState(false);
+
+  // Bulk selection
+  const [selectedConvos, setSelectedConvos] = useState<Set<string>>(new Set());
+  const toggleConvoSelect = useCallback((id: string) => {
+    setSelectedConvos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelectedConvos(new Set()), []);
 
   // Socket ref
   const socketRef = useRef<Socket | null>(null);
@@ -443,14 +461,24 @@ export default function ConversationsPage() {
 
   // ─── Counts per tab ────────────────────────────────────────────
   const counts = useMemo(() => {
-    const c = { ALL: conversations.length, AI: 0, HUMAN: 0, CLOSED: 0 };
+    const c = { ALL: conversations.length, AI: 0, HUMAN: 0, CLOSED: 0, NEEDS_ATTENTION: 0 };
     for (const conv of conversations) {
       if (conv.status === "AI") c.AI++;
       else if (conv.status === "HUMAN") c.HUMAN++;
       else if (conv.status === "CLOSED") c.CLOSED++;
+      // Needs attention = HUMAN + unassigned
+      if (conv.status === "HUMAN" && !conv.assignedToId) c.NEEDS_ATTENTION++;
     }
     return c;
   }, [conversations]);
+
+  // Filtered conversations for display
+  const filteredConversations = useMemo(() => {
+    if (tab === "NEEDS_ATTENTION") {
+      return conversations.filter((c) => c.status === "HUMAN" && !c.assignedToId);
+    }
+    return conversations;
+  }, [conversations, tab]);
 
   // ─── Actions ───────────────────────────────────────────────────
   const patchConversation = useCallback(
@@ -696,6 +724,7 @@ export default function ConversationsPage() {
                   { key: "ALL", label: "All", count: counts.ALL },
                   { key: "AI", label: "AI", count: counts.AI },
                   { key: "HUMAN", label: "Human", count: counts.HUMAN },
+                  { key: "NEEDS_ATTENTION", label: "Needs attention", count: counts.NEEDS_ATTENTION },
                   { key: "CLOSED", label: "Closed", count: counts.CLOSED },
                 ] as { key: Tab; label: string; count: number }[]
               ).map((t) => (
@@ -709,6 +738,7 @@ export default function ConversationsPage() {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
+                  {t.key === "NEEDS_ATTENTION" && <AlertTriangle className="size-3" />}
                   {t.label}
                   <span
                     className={cn(
@@ -726,27 +756,39 @@ export default function ConversationsPage() {
 
             {/* List */}
             <div className="flex-1 overflow-y-auto scroll-thin">
-              {loadingList && conversations.length === 0 ? (
+              {loadingList && filteredConversations.length === 0 ? (
                 <ListSkeleton />
-              ) : conversations.length === 0 ? (
-                <EmptyList />
+              ) : filteredConversations.length === 0 ? (
+                <EmptyList onClearFilters={() => { setSearch(""); setTab("ALL"); }} hasFilters={search.trim() !== "" || tab !== "ALL"} />
               ) : (
                 <ul className="divide-y">
-                  {conversations.map((conv) => {
+                  {filteredConversations.map((conv) => {
                     const name = conv.visitorName || conv.visitorEmail || "Visitor";
                     const isUnread = (unread[conv.id] ?? 0) > 0;
                     const isSelected = conv.id === selectedId;
+                    const isChecked = selectedConvos.has(conv.id);
                     return (
                       <li key={conv.id}>
                         <button
                           onClick={() => handleSelect(conv.id)}
                           className={cn(
-                            "w-full flex items-start gap-3 px-3 py-3 text-left transition-colors",
+                            "w-full flex items-start gap-3 px-3 py-3 text-left transition-all group relative",
                             isSelected
-                              ? "bg-accent/60"
-                              : "hover:bg-accent/40"
+                              ? "bg-accent/60 border-l-2 border-l-primary"
+                              : "hover:bg-muted/60 border-l-2 border-l-transparent"
                           )}
                         >
+                          {/* Checkbox */}
+                          <span
+                            className="mt-1 shrink-0"
+                            onClick={(e) => { e.stopPropagation(); toggleConvoSelect(conv.id); }}
+                          >
+                            {isChecked ? (
+                              <SquareCheck className="size-4 text-primary" />
+                            ) : (
+                              <Square className="size-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                            )}
+                          </span>
                           <Avatar className="size-9 mt-0.5">
                             <AvatarFallback
                               className={cn(
@@ -775,7 +817,7 @@ export default function ConversationsPage() {
                                   : "No messages yet"}
                               </p>
                               {isUnread && (
-                                <span className="size-2 rounded-full bg-violet-500 shrink-0" />
+                                <span className="size-2 rounded-full bg-violet-500 shrink-0 animate-glow-pulse" />
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-1.5">
@@ -792,6 +834,10 @@ export default function ConversationsPage() {
                                 <span className="text-[10px] text-muted-foreground">
                                   {conv.messageCount} msg
                                 </span>
+                              )}
+                              {/* Glow dot for HUMAN conversations needing attention */}
+                              {conv.status === "HUMAN" && !conv.assignedToId && (
+                                <span className="size-2 rounded-full bg-violet-500 shrink-0 animate-glow-pulse" title="Needs attention" />
                               )}
                             </div>
                           </div>
@@ -1218,7 +1264,7 @@ export default function ConversationsPage() {
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault();
                           void sendMessage();
                         }
@@ -1226,7 +1272,7 @@ export default function ConversationsPage() {
                       placeholder={
                         detail?.status === "CLOSED"
                           ? "This conversation is closed"
-                          : "Type your reply… (Enter to send, Shift+Enter for newline)"
+                          : "Type your reply… (⌘+Enter to send)"
                       }
                       disabled={detail?.status === "CLOSED"}
                       rows={2}
@@ -1249,13 +1295,23 @@ export default function ConversationsPage() {
                     <span className="text-[10px] text-muted-foreground">
                       {detail?.status === "CLOSED"
                         ? "Reopen to send messages"
-                        : "Press Enter to send"}
+                        : "⌘+Enter to send"}
                     </span>
-                    {detail && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {messages.length} messages
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {detail && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {messages.length} messages
+                        </span>
+                      )}
+                      {draft.length > 0 && (
+                        <span className={cn(
+                          "text-[10px] font-mono",
+                          draft.length > 800 ? "text-amber-500" : "text-muted-foreground"
+                        )}>
+                          {draft.length}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1387,6 +1443,72 @@ export default function ConversationsPage() {
             )}
           </section>
         </div>
+
+        {/* Bulk actions bar */}
+        <AnimatePresence>
+          {selectedConvos.size > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border bg-card shadow-2xl px-5 py-3"
+            >
+              <span className="text-sm font-medium">
+                {selectedConvos.size} selected
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={async () => {
+                  for (const id of selectedConvos) {
+                    try {
+                      await fetch(`/api/conversations/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "CLOSED" }),
+                      });
+                    } catch { /* ignore */ }
+                  }
+                  clearSelection();
+                  void fetchList();
+                }}
+              >
+                <X className="size-3.5" />
+                Close selected
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={async () => {
+                  for (const id of selectedConvos) {
+                    try {
+                      await fetch(`/api/conversations/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "HUMAN", assignedToId: "me" }),
+                      });
+                    } catch { /* ignore */ }
+                  }
+                  clearSelection();
+                  void fetchList();
+                }}
+              >
+                <UserCheck className="size-3.5" />
+                Assign to me
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearSelection}
+              >
+                Cancel
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </TooltipProvider>
   );
@@ -1481,8 +1603,11 @@ function MessageGroup({ group }: { group: { role: Message["role"]; items: Messag
           </span>
         )}
         {group.items.map((msg, i) => (
-          <div
+          <motion.div
             key={msg.id}
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.25 }}
             className={cn(
               "rounded-2xl px-3.5 py-2 text-sm break-words",
               isAgent
@@ -1494,7 +1619,7 @@ function MessageGroup({ group }: { group: { role: Message["role"]; items: Messag
             )}
           >
             {msg.content}
-          </div>
+          </motion.div>
         ))}
         <span className="text-[10px] text-muted-foreground px-1 flex items-center gap-1">
           <Clock className="size-2.5" />
@@ -1548,14 +1673,29 @@ function ListSkeleton() {
   );
 }
 
-function EmptyList() {
+function EmptyList({ onClearFilters, hasFilters }: { onClearFilters: () => void; hasFilters: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-16 px-6">
-      <Search className="size-8 mb-3 opacity-40" />
+      <div className="size-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
+        <Inbox className="size-8 opacity-40" />
+      </div>
       <p className="text-sm font-medium">No conversations found</p>
-      <p className="text-xs mt-1">
-        Try adjusting your search or filter.
+      <p className="text-xs mt-1 max-w-[200px]">
+        {hasFilters
+          ? "Try adjusting your search or filter to find what you're looking for."
+          : "Conversations will appear here when visitors start chatting."}
       </p>
+      {hasFilters && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4 gap-1.5"
+          onClick={onClearFilters}
+        >
+          <X className="size-3" />
+          Clear filters
+        </Button>
+      )}
     </div>
   );
 }

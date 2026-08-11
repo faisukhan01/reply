@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
   BarChart3,
   TrendingUp,
@@ -9,6 +10,7 @@ import {
   Clock,
   Loader2,
   Sparkles,
+  Download,
 } from "lucide-react";
 import {
   Bar,
@@ -191,7 +193,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
             <BarChart3 className="h-6 w-6" />
@@ -218,8 +220,13 @@ export default function AnalyticsPage() {
               {r.label}
             </Button>
           ))}
+          <div className="w-px h-5 bg-border mx-1" />
+          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1.5" onClick={() => { const csv = "Metric,Value\nResolution Rate," + resolutionRate.toFixed(1) + "%\nAvg Satisfaction," + avgSatisfaction.toFixed(1) + "\nTotal Messages," + totalMessages; const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "analytics-export.csv"; a.click(); URL.revokeObjectURL(url); }}>
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </Button>
         </div>
-      </div>
+      </motion.div>
 
       {error && !loading && (
         <Card className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
@@ -236,7 +243,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* KPI row */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.1 }} className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={TrendingUp}
           label="Resolution rate"
@@ -269,10 +276,10 @@ export default function AnalyticsPage() {
           accent="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
           loading={false}
         />
-      </div>
+      </motion.div>
 
       {/* Charts row 1 */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="grid gap-4 lg:grid-cols-3">
         {/* Conversations over time */}
         <Card className="rounded-xl border shadow-sm lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -399,10 +406,10 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Charts row 2 */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="grid gap-4 lg:grid-cols-3">
         {/* Satisfaction trend */}
         <Card className="rounded-xl border shadow-sm lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -510,9 +517,10 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Top questions */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }}>
       <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Top questions</CardTitle>
@@ -555,6 +563,7 @@ export default function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* Loading overlay for refetch */}
       {loading && (

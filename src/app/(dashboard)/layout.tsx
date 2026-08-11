@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
+import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
+import { ShortcutsDialog } from "@/components/dashboard/shortcuts-dialog";
 
 export default async function DashboardLayout({
   children,
@@ -18,6 +20,8 @@ export default async function DashboardLayout({
         <Topbar userName={user.name} orgName={user.orgName} />
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
+      <OnboardingModal />
+      <ShortcutsDialog />
     </div>
   );
 }

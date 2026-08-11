@@ -14,9 +14,14 @@ import {
   Sparkles,
   Inbox,
   TrendingUp,
+  Play,
+  BookOpen,
+  Code2,
+  Activity,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ConversationsAreaChart, StatusDonutChart } from "./_charts";
+import { StatCards } from "@/components/dashboard/stat-cards";
 
 type ConvRow = {
   id: string;
@@ -177,6 +182,10 @@ export default async function DashboardPage() {
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const maxQCount = topQuestions[0]?.count ?? 1;
 
+  // Today's conversations count
+  const todayKey = dayKey(new Date());
+  const todayConversations = conversationsTrend.find((t) => t.date === todayKey)?.count ?? 0;
+
   const stats = [
     {
       label: "Total Conversations",
@@ -207,13 +216,6 @@ export default async function DashboardPage() {
       delta: "+8 this week",
     },
   ];
-
-  const toneMap: Record<string, { bg: string; fg: string }> = {
-    violet: { bg: "bg-violet-100 dark:bg-violet-500/15", fg: "text-violet-600 dark:text-violet-300" },
-    emerald: { bg: "bg-emerald-100 dark:bg-emerald-500/15", fg: "text-emerald-600 dark:text-emerald-300" },
-    amber: { bg: "bg-amber-100 dark:bg-amber-500/15", fg: "text-amber-600 dark:text-amber-300" },
-    fuchsia: { bg: "bg-fuchsia-100 dark:bg-fuchsia-500/15", fg: "text-fuchsia-600 dark:text-fuchsia-300" },
-  };
 
   function statusBadge(status: string) {
     if (status === "AI")
@@ -268,33 +270,63 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* Row 1 — stat cards */}
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map((s) => {
-          const Icon = s.icon;
-          const tone = toneMap[s.tone];
+      {/* Quick Actions */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { icon: Play, label: "Test your bot", href: "/chatbot", tone: "violet" },
+          { icon: Inbox, label: "View inbox", href: "/conversations", tone: "emerald" },
+          { icon: BookOpen, label: "Add knowledge", href: "/chatbot?tab=knowledge", tone: "amber" },
+          { icon: Code2, label: "Widget demo", href: "/widget-demo", tone: "fuchsia" },
+        ].map((action) => {
+          const ActionIcon = action.icon;
+          const bgMap: Record<string, string> = {
+            violet: "bg-violet-50 dark:bg-violet-500/10 border-violet-200/60 dark:border-violet-500/20 hover:bg-violet-100 dark:hover:bg-violet-500/15",
+            emerald: "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200/60 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/15",
+            amber: "bg-amber-50 dark:bg-amber-500/10 border-amber-200/60 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/15",
+            fuchsia: "bg-fuchsia-50 dark:bg-fuchsia-500/10 border-fuchsia-200/60 dark:border-fuchsia-500/20 hover:bg-fuchsia-100 dark:hover:bg-fuchsia-500/15",
+          };
+          const iconColorMap: Record<string, string> = {
+            violet: "text-violet-600 dark:text-violet-300",
+            emerald: "text-emerald-600 dark:text-emerald-300",
+            amber: "text-amber-600 dark:text-amber-300",
+            fuchsia: "text-fuchsia-600 dark:text-fuchsia-300",
+          };
           return (
-            <Card key={s.label} className="rounded-xl shadow-sm">
-              <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex items-start justify-between">
-                  <div className={`flex size-10 items-center justify-center rounded-xl ${tone.bg}`}>
-                    <Icon className={`size-5 ${tone.fg}`} />
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    <ArrowUpRight className="size-3.5" />
-                    {s.delta}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold tracking-tight tabular-nums">
-                    {s.value}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
-                </div>
-              </CardContent>
-            </Card>
+            <Button
+              key={action.label}
+              asChild
+              variant="outline"
+              className={`h-auto flex-col gap-2 rounded-xl border py-4 transition-colors ${bgMap[action.tone]}`}
+            >
+              <Link href={action.href}>
+                <ActionIcon className={`size-5 ${iconColorMap[action.tone]}`} />
+                <span className="text-xs font-medium">{action.label}</span>
+              </Link>
+            </Button>
           );
         })}
+      </section>
+
+      {/* Row 1 — stat cards (animated) */}
+      <StatCards stats={stats} />
+
+      {/* Today's Activity */}
+      <section className="flex items-center gap-3 rounded-xl border border-violet-200/40 dark:border-violet-500/20 bg-violet-50/50 dark:bg-violet-500/5 px-4 py-3">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+          <Activity className="size-4 text-violet-600 dark:text-violet-300" />
+        </div>
+        <div className="flex-1">
+          <span className="text-sm font-medium">Today&apos;s Activity</span>
+          <span className="ml-2 text-sm text-muted-foreground">
+            {todayConversations} conversation{todayConversations !== 1 ? "s" : ""} today
+          </span>
+        </div>
+        <Button asChild variant="ghost" size="sm" className="text-violet-600 dark:text-violet-300 hover:text-violet-700">
+          <Link href="/conversations">
+            View all
+            <ArrowUpRight className="size-3.5" />
+          </Link>
+        </Button>
       </section>
 
       {/* Row 2 — area chart + donut */}

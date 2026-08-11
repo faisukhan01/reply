@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bot, Send, Minus, MessageSquare, AlertCircle, Star } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Bot, Send, Minus, MessageSquare, AlertCircle, Star, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type WidgetConfig = {
@@ -21,10 +22,9 @@ type ChatMsg = {
 };
 
 const VISITOR_ID_KEY = "replyai_visitor_id";
+const VISITOR_NAME_KEY = "replyai_visitor_name";
 
 function getOrCreateVisitorId(): string {
-  // Only ever runs in the browser (this is a "use client" component),
-  // but guard for SSR just in case.
   if (typeof window === "undefined") {
     return "v-" + Math.random().toString(36).slice(2, 12);
   }
@@ -39,10 +39,33 @@ function getOrCreateVisitorId(): string {
     }
     return id;
   } catch {
-    // localStorage may be disabled (private mode) — fall back to a random id.
     return "v-" + Math.random().toString(36).slice(2, 12);
   }
 }
+
+function getStoredVisitorName(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(VISITOR_NAME_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function storeVisitorName(name: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VISITOR_NAME_KEY, name);
+  } catch {
+    /* ignore */
+  }
+}
+
+const QUICK_ACTIONS = [
+  { label: "Pricing info", message: "I'd like to know about pricing" },
+  { label: "Business hours", message: "What are your business hours?" },
+  { label: "Talk to a human", message: "I'd like to speak with a human agent" },
+];
 
 export default function WidgetPage() {
   const params = useParams<{ botId: string }>();
@@ -56,11 +79,17 @@ export default function WidgetPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [minimized, setMinimized] = useState(false);
+  const [widgetOpen, setWidgetOpen] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSurvey, setShowSurvey] = useState(false);
   const [surveySubmitted, setSurveySubmitted] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
+  const [selectedRating, setSelectedRating] = useState(0);
+
+  // Visitor name flow
+  const [visitorName, setVisitorName] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +98,12 @@ export default function WidgetPage() {
   // Generate / load a stable visitorId once on mount.
   useEffect(() => {
     visitorIdRef.current = getOrCreateVisitorId();
+    const stored = getStoredVisitorName();
+    if (stored) {
+      setVisitorName(stored);
+    } else {
+      setShowNamePrompt(true);
+    }
   }, []);
 
   // Fetch the bot's public config.
@@ -113,17 +148,17 @@ export default function WidgetPage() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, sending, minimized]);
+  }, [messages, sending, widgetOpen]);
 
   // Refocus input after sending.
   useEffect(() => {
-    if (!minimized && !sending && inputRef.current) {
+    if (widgetOpen && !sending && inputRef.current && !showNamePrompt) {
       inputRef.current.focus();
     }
-  }, [sending, minimized]);
+  }, [sending, widgetOpen, showNamePrompt]);
 
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(textOverride?: string) {
+    const text = (textOverride ?? input).trim();
     if (!text || sending || !config || paused) return;
 
     const visitorMsg: ChatMsg = {
@@ -143,6 +178,7 @@ export default function WidgetPage() {
           botId,
           visitorId: visitorIdRef.current,
           message: text,
+          visitorName: visitorName || undefined,
         }),
       });
       const data = await res.json();
@@ -185,7 +221,17 @@ export default function WidgetPage() {
     }
   }
 
+  function handleSubmitName() {
+    const name = nameInput.trim();
+    if (!name) return;
+    setVisitorName(name);
+    storeVisitorName(name);
+    setShowNamePrompt(false);
+    setNameInput("");
+  }
+
   async function submitRating(rating: number) {
+    setSelectedRating(rating);
     setSurveySubmitted(true);
     setShowSurvey(false);
     if (conversationId) {
@@ -214,6 +260,7 @@ export default function WidgetPage() {
 
   const primaryColor = config?.primaryColor || "#8b5cf6";
   const botName = config?.name || "Assistant";
+  const hasQuickActions = messages.length <= 1 && !sending;
 
   // ---------- States: loading / paused / not-found ----------
   if (loading) {
@@ -262,19 +309,23 @@ export default function WidgetPage() {
   }
 
   // ---------- Minimized state ----------
-  if (minimized) {
+  if (!widgetOpen) {
     return (
       <div
         className="h-screen w-full flex items-end justify-end p-4 bg-transparent"
         style={{ ["--bot-color" as string]: primaryColor }}
       >
-        <button
-          onClick={() => setMinimized(false)}
+        <motion.button
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setWidgetOpen(true)}
           aria-label="Open chat"
-          className="h-14 w-14 rounded-full bg-[var(--bot-color)] text-white shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+          className="h-14 w-14 rounded-full bg-[var(--bot-color)] text-white shadow-2xl flex items-center justify-center"
         >
           <MessageSquare className="h-6 w-6" />
-        </button>
+        </motion.button>
       </div>
     );
   }
@@ -285,7 +336,13 @@ export default function WidgetPage() {
       className="h-screen w-full bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/30 flex items-stretch sm:items-center sm:justify-center sm:p-4"
       style={{ ["--bot-color" as string]: primaryColor }}
     >
-      <div className="flex flex-col w-full h-full sm:max-w-md sm:h-[640px] sm:max-h-[90vh] sm:rounded-2xl bg-card sm:shadow-2xl overflow-hidden border sm:border-border">
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="flex flex-col w-full h-full sm:max-w-md sm:h-[640px] sm:max-h-[90vh] sm:rounded-2xl bg-card sm:shadow-2xl overflow-hidden border sm:border-border"
+      >
         {/* Header */}
         <header
           className="flex items-center gap-3 px-4 py-3 text-white shrink-0 bg-[var(--bot-color)]"
@@ -307,7 +364,7 @@ export default function WidgetPage() {
             </div>
           </div>
           <button
-            onClick={() => setMinimized(true)}
+            onClick={() => setWidgetOpen(false)}
             aria-label="Minimize chat"
             className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors shrink-0"
           >
@@ -320,12 +377,42 @@ export default function WidgetPage() {
           ref={scrollRef}
           className="flex-1 overflow-y-auto scroll-thin px-4 py-4 space-y-3 bg-gradient-to-b from-background to-muted/30"
         >
-          {messages.map((m) => (
-            <Bubble key={m.id} msg={m} primaryColor={primaryColor} />
-          ))}
+          <AnimatePresence initial={false}>
+            {messages.map((m) => (
+              <Bubble key={m.id} msg={m} primaryColor={primaryColor} />
+            ))}
+          </AnimatePresence>
+
+          {/* Quick actions */}
+          <AnimatePresence>
+            {hasQuickActions && !showNamePrompt && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-wrap gap-2 pt-2"
+              >
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    onClick={() => handleSend(action.message)}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium text-white transition-all hover:opacity-90 active:scale-95"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {sending && (
-            <div className="flex items-end gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-end gap-2"
+            >
               <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0">
                 <Bot className="h-4 w-4 text-muted-foreground" />
               </div>
@@ -334,73 +421,146 @@ export default function WidgetPage() {
                 <span className="typing-dot h-2 w-2 rounded-full bg-muted-foreground/70" />
                 <span className="typing-dot h-2 w-2 rounded-full bg-muted-foreground/70" />
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
 
-        {/* Satisfaction survey */}
-        {showSurvey && !surveySubmitted && (
-          <div className="shrink-0 border-t bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3 animate-fade-in-up">
-            <div className="text-center">
-              <div className="text-xs font-medium text-violet-900 dark:text-violet-100 mb-1">
-                How was your experience?
-              </div>
-              <div className="flex items-center justify-center gap-1.5">
-                {[1, 2, 3, 4, 5].map((n) => (
+        {/* Visitor name prompt */}
+        <AnimatePresence>
+          {showNamePrompt && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0 border-t bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3 overflow-hidden"
+            >
+              <div className="text-center">
+                <div className="text-sm font-medium text-violet-900 dark:text-violet-100 mb-2">
+                  Hi! What&apos;s your name?
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSubmitName();
+                    }}
+                    placeholder="Your name"
+                    className="flex-1 h-9 rounded-full bg-white dark:bg-card px-4 text-sm outline-none focus:ring-2 focus:ring-violet-400 transition-all placeholder:text-muted-foreground"
+                    autoFocus
+                  />
                   <button
-                    key={n}
-                    onClick={() => submitRating(n)}
-                    onMouseEnter={() => setHoverRating(n)}
-                    onMouseLeave={() => setHoverRating(0)}
-                    className="p-0.5 transition-transform hover:scale-125"
-                    aria-label={`Rate ${n} stars`}
+                    onClick={handleSubmitName}
+                    disabled={!nameInput.trim()}
+                    className="h-9 px-4 rounded-full text-white text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
+                    style={{ backgroundColor: primaryColor }}
                   >
-                    <Star
-                      className={cn(
-                        "h-6 w-6 transition-colors",
-                        n <= hoverRating
-                          ? "fill-amber-400 text-amber-400"
-                          : "fill-transparent text-amber-300 hover:text-amber-400"
-                      )}
-                    />
+                    Go
                   </button>
-                ))}
+                </div>
               </div>
-              <button
-                onClick={() => setShowSurvey(false)}
-                className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5"
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Satisfaction survey */}
+        <AnimatePresence>
+          {showSurvey && !surveySubmitted && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0 border-t bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3 overflow-hidden"
+            >
+              <div className="text-center">
+                <div className="text-xs font-medium text-violet-900 dark:text-violet-100 mb-1.5">
+                  Rate this conversation
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => submitRating(n)}
+                      onMouseEnter={() => setHoverRating(n)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      className="star-interactive p-0.5"
+                      aria-label={`Rate ${n} stars`}
+                    >
+                      <Star
+                        className={cn(
+                          "h-6 w-6 transition-colors",
+                          n <= (hoverRating || selectedRating)
+                            ? "fill-amber-400 text-amber-400"
+                            : "fill-transparent text-amber-300 hover:text-amber-400"
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setShowSurvey(false)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5"
+                >
+                  Maybe later
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Survey thank you (animated heart) */}
+        <AnimatePresence>
+          {surveySubmitted && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              className="shrink-0 border-t bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-2 text-center"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500, damping: 15, delay: 0.1 }}
+                className="inline-flex items-center gap-1 text-sm text-violet-600 dark:text-violet-300"
               >
-                Maybe later
-              </button>
-            </div>
-          </div>
-        )}
+                <Heart className="size-4 fill-violet-500 text-violet-500" />
+                Thank you!
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Composer */}
-        <div className="shrink-0 border-t bg-card p-3 flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message…"
-            disabled={sending}
-            className="flex-1 h-11 rounded-full bg-muted px-4 text-sm outline-none focus:ring-2 focus:ring-[var(--bot-color)] focus:bg-background transition-all placeholder:text-muted-foreground disabled:opacity-60"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-            aria-label="Send message"
-            className={cn(
-              "h-11 w-11 rounded-full flex items-center justify-center text-white shrink-0 transition-all",
-              "bg-[var(--bot-color)] hover:opacity-90 active:scale-95",
-              "disabled:opacity-40 disabled:cursor-not-allowed"
-            )}
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </div>
+        {!showNamePrompt && (
+          <div className="shrink-0 border-t bg-card p-3 flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={visitorName ? `Type your message, ${visitorName}…` : "Type your message…"}
+              disabled={sending}
+              className="flex-1 h-11 rounded-full bg-muted px-4 text-sm outline-none focus:ring-2 focus:ring-[var(--bot-color)] focus:bg-background transition-all placeholder:text-muted-foreground disabled:opacity-60"
+            />
+            <button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || sending}
+              aria-label="Send message"
+              className={cn(
+                "h-11 w-11 rounded-full flex items-center justify-center text-white shrink-0 transition-all",
+                "bg-[var(--bot-color)] hover:opacity-90 active:scale-95",
+                "disabled:opacity-40 disabled:cursor-not-allowed"
+              )}
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Powered-by footer */}
         <div className="shrink-0 bg-card px-4 py-2 text-center border-t">
@@ -416,7 +576,7 @@ export default function WidgetPage() {
             </span>
           </a>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -430,7 +590,10 @@ function Bubble({
 }) {
   const isVisitor = msg.role === "VISITOR";
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.25, type: "spring", stiffness: 400, damping: 25 }}
       className={cn(
         "flex items-end gap-2",
         isVisitor ? "justify-end" : "justify-start"
@@ -459,6 +622,6 @@ function Bubble({
       >
         {msg.content}
       </div>
-    </div>
+    </motion.div>
   );
 }

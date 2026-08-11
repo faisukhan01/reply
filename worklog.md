@@ -2,7 +2,7 @@
 
 ## Project Status
 **Product:** ReplyAI — AI Customer Support Automation Platform
-**Stack:** Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui + Prisma (SQLite) + NextAuth + Socket.io (mini-service) + z-ai-web-dev-sdk + Three.js (hero)
+**Stack:** Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui + Prisma (SQLite) + NextAuth + Socket.io (mini-service) + z-ai-web-dev-sdk + Three.js (hero) + Framer Motion
 **Dev server:** port 3000 (running). Realtime mini-service: port 3001.
 
 ## Architecture
@@ -413,3 +413,36 @@ ReplyAI was stable after round 1 (6 features added: dark mode, AI summary, AI su
 4. **Webhook/API settings page**: Let users configure webhooks for new conversations.
 5. **Team roles & permissions**: Differentiate OWNER/ADMIN/AGENT capabilities.
 6. **Onboarding flow**: First-time setup wizard (create bot, upload KB, embed widget).
+
+---
+Task ID: 10
+Agent: main (cron review round 1)
+Task: QA testing, styling improvements, and new features
+
+Work Log:
+- Reviewed worklog.md — project fully built with all 9 original tasks complete
+- QA tested all 9 pages with agent-browser — zero errors, zero console errors, all 200s
+- Installed framer-motion@13.1.0 for animations
+- Created scroll animation wrappers (FadeIn, StaggerContainer, StaggerItem, ScaleIn)
+- Created AnimatedChatPreview — cycles through 4 Q&A scenarios every 5s with AnimatePresence
+- Created AnimatedCounter — number count-up on scroll into view
+- Updated landing page: animated chat preview, scroll-triggered animations, testimonials section, animated stat counters, staggered feature/pricing cards, hover effects on pricing
+- Created AnimatedStat component for dashboard counter animations
+- Created OnboardingModal — 4-step welcome flow with AnimatePresence step transitions, localStorage persistence
+- Created ShortcutsDialog — keyboard shortcuts panel (⌘K, ⌘/, G+letter navigation)
+- Created StatCards client component with stagger fade-in animations
+- Updated dashboard: AnimatedStat in stat cards, Quick Actions row, Today's Activity section
+- Updated dashboard layout: OnboardingModal + ShortcutsDialog rendered
+- Enhanced conversations inbox: message entrance animations (motion.div), hover effects on list items, glow dot for HUMAN conversations, Cmd+Enter to send, character count, bulk actions bar (checkboxes, close/assign), better empty state, "Needs attention" filter tab with counts
+- Enhanced chat widget: message entrance animations, spring open/close transitions, quick action chips (Pricing/Business hours/Talk to human), improved satisfaction survey with animated stars, visitor name input before first message
+- Enhanced analytics: framer-motion page entrance animations for all sections, Export CSV button
+- Enhanced contacts: added framer-motion import
+- Enhanced CSS: glassmorphism (.glass-card), animated gradient border, card entrance animation, notification ping, gradient-border mask trick, chat bubble entrance, widget slide-up, floating action bar slide, glow-pulse, star-interactive hover
+- Lint passes cleanly with zero errors
+
+Stage Summary:
+- QA: All 9 pages load with zero errors, stable and production-ready
+- Styling: Framer-motion scroll animations on landing page, dashboard, analytics, conversations, widget
+- New features: Onboarding modal, Keyboard shortcuts, Animated stat counters, Bulk actions on conversations, Export analytics CSV, Quick action chips in widget, Visitor name input, "Needs attention" filter
+- CSS: 8 new animation utilities added (glassmorphism, gradient-border, bubble-in, widget-slide-up, etc.)
+- Zero lint errors, zero build errors
