@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bot, Send, Minus, MessageSquare, AlertCircle } from "lucide-react";
+import { Bot, Send, Minus, MessageSquare, AlertCircle, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type WidgetConfig = {
@@ -57,6 +57,10 @@ export default function WidgetPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [surveySubmitted, setSurveySubmitted] = useState(false);
+  const [hoverRating, setHoverRating] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -150,6 +154,14 @@ export default function WidgetPage() {
           "Sorry, I didn't quite catch that. Could you rephrase?",
       };
       setMessages((prev) => [...prev, reply]);
+      if (data?.conversationId) {
+        setConversationId(data.conversationId);
+      }
+      // Show survey after 3+ visitor messages (meaningful conversation)
+      const visitorMsgCount = messages.filter((m) => m.role === "VISITOR").length;
+      if (visitorMsgCount >= 2 && !surveySubmitted) {
+        setTimeout(() => setShowSurvey(true), 1500);
+      }
     } catch (e) {
       console.error("[widget] send failed", e);
       setMessages((prev) => [
@@ -171,6 +183,33 @@ export default function WidgetPage() {
       e.preventDefault();
       handleSend();
     }
+  }
+
+  async function submitRating(rating: number) {
+    setSurveySubmitted(true);
+    setShowSurvey(false);
+    if (conversationId) {
+      try {
+        await fetch(`/api/conversations/${conversationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ satisfaction: rating }),
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: "sys-" + Date.now(),
+        role: "AI",
+        content:
+          rating >= 4
+            ? "Thank you so much for your feedback! I'm glad I could help. Have a wonderful day! ✨"
+            : "Thank you for the feedback. I'll share this with our team so we can improve. Is there anything else I can help with?",
+      },
+    ]);
   }
 
   const primaryColor = config?.primaryColor || "#8b5cf6";
@@ -298,6 +337,44 @@ export default function WidgetPage() {
             </div>
           )}
         </div>
+
+        {/* Satisfaction survey */}
+        {showSurvey && !surveySubmitted && (
+          <div className="shrink-0 border-t bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3 animate-fade-in-up">
+            <div className="text-center">
+              <div className="text-xs font-medium text-violet-900 dark:text-violet-100 mb-1">
+                How was your experience?
+              </div>
+              <div className="flex items-center justify-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => submitRating(n)}
+                    onMouseEnter={() => setHoverRating(n)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    className="p-0.5 transition-transform hover:scale-125"
+                    aria-label={`Rate ${n} stars`}
+                  >
+                    <Star
+                      className={cn(
+                        "h-6 w-6 transition-colors",
+                        n <= hoverRating
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-transparent text-amber-300 hover:text-amber-400"
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowSurvey(false)}
+                className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Composer */}
         <div className="shrink-0 border-t bg-card p-3 flex items-center gap-2">

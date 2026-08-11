@@ -22,6 +22,8 @@ import {
   Wand2,
   Zap,
   ChevronDown,
+  Star,
+  Download,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -86,11 +88,17 @@ type ConversationDetail = {
   status: ConvStatus;
   satisfaction: number | null;
   assignedToId: string | null;
+  assignedAgent: { id: string; name: string; email: string } | null;
   channel: string;
   summary: string | null;
   createdAt: string;
   updatedAt: string;
   chatbot: { id: string; name: string };
+  visitor: {
+    totalConversations: number;
+    totalMessages: number;
+    firstSeen: string;
+  };
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -224,6 +232,14 @@ export default function ConversationsPage() {
     { id: string; title: string; content: string; shortcut: string | null }[]
   >([]);
   const [cannedOpen, setCannedOpen] = useState(false);
+
+  // Team members (for Assign dropdown)
+  const [members, setMembers] = useState<
+    { id: string; name: string; email: string; role: string }[]
+  >([]);
+
+  // Visitor info panel toggle
+  const [showVisitorPanel, setShowVisitorPanel] = useState(false);
 
   // Socket ref
   const socketRef = useRef<Socket | null>(null);
@@ -582,6 +598,21 @@ export default function ConversationsPage() {
     })();
   }, []);
 
+  // ─── Team members (for Assign dropdown) ─────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          setMembers(data.org?.users ?? []);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
   // Auto-load suggestions when conversation changes (if there are messages)
   useEffect(() => {
     if (selectedId && messages.length > 0 && suggestions.length === 0) {
@@ -622,6 +653,17 @@ export default function ConversationsPage() {
               <MessageSquare className="size-3" />
               {counts.ALL} total
             </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                window.open("/api/conversations/export", "_blank");
+              }}
+            >
+              <Download className="size-3.5" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
           </div>
         </div>
 
@@ -932,14 +974,32 @@ export default function ConversationsPage() {
                             <span className="hidden sm:inline">Reopen</span>
                           </Button>
                         )}
-                        {/* Assign dropdown (demo) */}
+                        {/* Visitor info toggle */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className={cn(
+                                "size-8",
+                                showVisitorPanel &&
+                                  "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                              )}
+                              onClick={() => setShowVisitorPanel((v) => !v)}
+                            >
+                              <UserIcon className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Visitor info</TooltipContent>
+                        </Tooltip>
+                        {/* Assign dropdown */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button size="icon" variant="ghost" className="size-8">
                               <MoreVertical className="size-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="w-60">
                             <DropdownMenuLabel>Assign to</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -952,13 +1012,37 @@ export default function ConversationsPage() {
                               <UserIcon className="size-3.5 mr-2" />
                               Unassign
                             </DropdownMenuItem>
-                            <DropdownMenuItem disabled>
-                              <Users className="size-3.5 mr-2" />
-                              Demo team member
-                            </DropdownMenuItem>
+                            {members.map((m) => (
+                              <DropdownMenuItem
+                                key={m.id}
+                                onClick={() =>
+                                  void patchConversation({
+                                    assignedToId: m.id,
+                                  })
+                                }
+                                className={cn(
+                                  detail.assignedToId === m.id &&
+                                    "bg-violet-50 dark:bg-violet-950/30"
+                                )}
+                              >
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-[9px] font-semibold mr-2">
+                                  {m.name.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="truncate">{m.name}</span>
+                                {detail.assignedToId === m.id && (
+                                  <Check className="size-3 ml-auto text-violet-600" />
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                            {members.length === 0 && (
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                No team members yet
+                              </div>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Channel</DropdownMenuLabel>
                             <DropdownMenuItem disabled>
+                              <MessageSquare className="size-3.5 mr-2" />
                               {detail.channel}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -1001,6 +1085,8 @@ export default function ConversationsPage() {
                   </div>
                 )}
 
+                {/* Messages + Visitor panel row */}
+                <div className="flex-1 flex min-h-0">
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto scroll-thin px-4 py-4 bg-muted/30">
                   {loadingDetail ? (
@@ -1172,6 +1258,131 @@ export default function ConversationsPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Visitor info panel (inside flex row, beside messages) */}
+                {showVisitorPanel && detail && (
+                  <aside className="hidden lg:flex w-72 shrink-0 border-l bg-card flex-col overflow-y-auto scroll-thin">
+                    <div className="flex items-center justify-between px-4 py-3 border-b">
+                      <span className="text-sm font-semibold">Visitor info</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={() => setShowVisitorPanel(false)}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </div>
+                    <div className="p-4 space-y-5">
+                      {/* Avatar + identity */}
+                      <div className="flex flex-col items-center text-center pb-4 border-b">
+                        <Avatar className="size-16 mb-2">
+                          <AvatarFallback
+                            className={cn(
+                              "text-white text-lg font-semibold",
+                              avatarColor(
+                                detail.visitorName ||
+                                  detail.visitorEmail ||
+                                  "Visitor"
+                              )
+                            )}
+                          >
+                            {initials(detail.visitorName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="text-sm font-medium">
+                          {detail.visitorName || "Anonymous Visitor"}
+                        </div>
+                        {detail.visitorEmail && (
+                          <div className="text-xs text-muted-foreground truncate w-full mt-0.5">
+                            {detail.visitorEmail}
+                          </div>
+                        )}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] px-1.5 py-0 h-4 mt-2",
+                            statusBadgeClass(detail.status)
+                          )}
+                        >
+                          {statusLabel(detail.status)}
+                        </Badge>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg border p-2.5 text-center">
+                          <div className="text-lg font-bold text-violet-600 dark:text-violet-400">
+                            {detail.visitor?.totalConversations ?? 1}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Conversations
+                          </div>
+                        </div>
+                        <div className="rounded-lg border p-2.5 text-center">
+                          <div className="text-lg font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                            {detail.visitor?.totalMessages ?? messages.length}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Messages
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-2.5 text-xs">
+                        <div className="flex items-start gap-2">
+                          <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-muted-foreground">First seen</div>
+                            <div className="font-medium">
+                              {timeAgo(detail.visitor?.firstSeen || detail.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-muted-foreground">Channel</div>
+                            <div className="font-medium">{detail.channel}</div>
+                          </div>
+                        </div>
+                        {detail.assignedAgent && (
+                          <div className="flex items-start gap-2">
+                            <Headphones className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                            <div>
+                              <div className="text-muted-foreground">Assigned to</div>
+                              <div className="font-medium">{detail.assignedAgent.name}</div>
+                            </div>
+                          </div>
+                        )}
+                        {detail.satisfaction !== null && (
+                          <div className="flex items-start gap-2">
+                            <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+                            <div>
+                              <div className="text-muted-foreground">Satisfaction</div>
+                              <div className="font-medium">
+                                {detail.satisfaction}/5
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Visitor ID */}
+                      <div className="pt-3 border-t">
+                        <div className="text-[10px] text-muted-foreground mb-1">
+                          Visitor ID
+                        </div>
+                        <code className="text-[10px] bg-muted px-2 py-1 rounded block break-all">
+                          {detail.visitorId}
+                        </code>
+                      </div>
+                    </div>
+                  </aside>
+                )}
+                </div>
+                {/* /Messages + Visitor panel row */}
               </>
             )}
           </section>

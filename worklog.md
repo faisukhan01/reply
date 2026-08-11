@@ -330,3 +330,86 @@ ReplyAI (AI Customer Support SaaS) was fully built and verified in prior rounds.
 4. **Add visitor info panel** in inbox (browser, location, visit history, current page).
 5. **Add CSV/PDF export** for conversations and analytics reports.
 6. **Emit `join:org`** in the inbox for true cross-conversation real-time updates (eliminate polling).
+
+---
+Task ID: CRON-REVIEW-2
+Agent: main (orchestrator) — webDevReview cron round 2
+Task: QA testing + 5 new features (Saved Replies management, Assign wiring, Visitor panel, Satisfaction survey, CSV export)
+
+## Current Project Status Assessment
+ReplyAI was stable after round 1 (6 features added: dark mode, AI summary, AI suggestions, command palette, canned responses, notifications). This round tackled the priority recommendations from round 1: Saved Replies CRUD UI, Assign dropdown wiring, visitor info panel, satisfaction survey, and CSV export. All 5 features built and verified end-to-end with zero errors.
+
+## Completed Modifications
+
+### QA & Fixes
+- Restarted realtime service (port 3001) which had stopped.
+- Fixed a stale Turbopack cache issue causing phantom "Parsing ecmascript source code failed" errors — cleared `.next` cache and restarted dev server.
+- Fixed visitor panel layout: moved the `<aside>` INSIDE the flex row wrapper so it sits beside messages (was previously a sibling, which would break layout).
+- Verified all pages load with zero console errors after cache clear.
+
+### New Features (5 added)
+
+1. **Saved Replies Management Page** (`src/components/dashboard/saved-replies-tab.tsx` + Settings tab)
+   - Full CRUD UI: create, edit, delete canned responses with title, content, shortcut.
+   - New "Replies" tab in Settings (now 6 tabs, grid changed to 6 cols).
+   - Card list with hover-lift, edit/delete actions, shortcut badges, empty state with CTA.
+   - Tips sidebar with 3 numbered tips + pro tip card.
+   - Create/Edit Dialog with form validation. Delete AlertDialog confirm.
+   - Verified: created "Test Reply" with shortcut /test → toast "Saved reply created" → appeared in list.
+
+2. **Assign Dropdown Wired to Real Team Members** (conversations page)
+   - Fetches members from `/api/settings` (org.users).
+   - Assign dropdown now lists real team members with avatars + checkmark on current assignee.
+   - Clicking a member PATCHes `assignedToId` and updates the conversation.
+   - Verified: assigned "Demo Owner" → visitor panel showed "Assigned to: Demo Owner".
+   - Updated `/api/conversations/[id]` GET to return `assignedAgent` (id, name, email).
+
+3. **Visitor Info Panel** (conversations page)
+   - Toggle button (UserIcon) in conversation header. 72px-wide aside panel beside messages.
+   - Shows: large avatar, name, email, status badge, stats grid (total conversations + total messages for this visitor), first seen, channel, assigned agent, satisfaction, visitor ID.
+   - Updated `/api/conversations/[id]` GET to return `visitor` object (totalConversations, totalMessages, firstSeen).
+   - Verified: panel showed "NF, Noor Fatima, noor.fatima@gmail.com, AI, 1 conversation, 2 messages, first seen ~12h ago, WIDGET channel, Visitor ID".
+   - Hidden on mobile (<lg), toggle button persists.
+
+4. **Satisfaction Survey in Widget** (`src/app/widget/[botId]/page.tsx`)
+   - After 3+ visitor messages, a star rating survey (1-5) slides in below messages.
+   - Hover effect fills stars gold. "Maybe later" dismiss button.
+   - On rating: PATCHes `satisfaction` to the conversation, shows a thank-you AI message (positive for 4-5★, empathetic for 1-3★).
+   - Verified: sent 3 messages in widget → survey appeared → rated 5 stars → "Thank you so much for your feedback! I'm glad I could help. Have a wonderful day! ✨" appeared.
+
+5. **CSV Export for Conversations** (`src/app/api/conversations/export/route.ts` + inbox button)
+   - GET endpoint exports up to 1000 conversations as CSV with 12 columns (ID, visitor name/email, status, channel, satisfaction, assigned to, message count, dates, first visitor message, last message).
+   - "Export CSV" button with Download icon in inbox header.
+   - Verified: button present, opens download in new tab.
+
+### Styling
+- Settings page: 6-tab grid (was 5), Replies tab with Zap icon.
+- Saved Replies cards: hover-lift + violet accent on hover.
+- Visitor panel: gradient stat cards (violet/fuchsia), amber star for satisfaction.
+- Widget survey: gradient violet→fuchsia background, animated fade-in-up, hover scale on stars.
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- agent-browser QA (all verified):
+  - Settings → Replies tab: 6 saved replies listed, created new reply successfully ✅
+  - Inbox → Assign dropdown: real team member "Demo Owner" selectable, assignment persisted ✅
+  - Inbox → Visitor info panel: all details render (avatar, stats, channel, assigned agent) ✅
+  - Inbox → Export CSV button: present and functional ✅
+  - Widget → satisfaction survey: appears after 3 messages, star rating works, thank-you message shows ✅
+  - AI suggestions: clean content (no "REPLY1" leak) ✅
+- Dev server: port 3000 running (cache cleared). Realtime: port 3001 running.
+- Zero console errors after cache clear.
+
+## Unresolved Issues / Risks
+1. **Turbopack cache**: Occasionally shows stale parse errors that don't affect rendering. Fixed by clearing `.next` and restarting. Low risk.
+2. **Visitor panel mobile**: Hidden on mobile (`hidden lg:flex`) — mobile users can't see visitor details. Could add a Sheet/drawer version in a future round.
+3. **CSV export auth**: Uses cookie-based session (window.open) — works in browser but the endpoint returns 401 if session expired. Acceptable for now.
+4. **Satisfaction survey timing**: Triggers after 3 visitor messages. Could be smarter (e.g., after conversation is closed or after a positive AI reply).
+
+## Priority Recommendations for Next Phase
+1. **Mobile visitor panel**: Add a Sheet/Drawer version of the visitor info panel for mobile.
+2. **Conversation search enhancement**: Add date range + status multi-filter.
+3. **Bulk actions**: Select multiple conversations → close/assign/delete in bulk.
+4. **Webhook/API settings page**: Let users configure webhooks for new conversations.
+5. **Team roles & permissions**: Differentiate OWNER/ADMIN/AGENT capabilities.
+6. **Onboarding flow**: First-time setup wizard (create bot, upload KB, embed widget).

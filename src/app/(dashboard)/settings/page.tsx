@@ -13,6 +13,7 @@ import {
   UserPlus,
   Users,
   Trash2,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SavedRepliesTab } from "@/components/dashboard/saved-replies-tab";
 
 type Member = {
   id: string;
@@ -256,7 +258,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="organization" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto sm:h-9">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto sm:h-9">
           <TabsTrigger value="organization">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Organization</span>
@@ -264,6 +266,10 @@ export default function SettingsPage() {
           <TabsTrigger value="members">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Team</span>
+          </TabsTrigger>
+          <TabsTrigger value="replies">
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Replies</span>
           </TabsTrigger>
           <TabsTrigger value="billing">
             <CreditCard className="h-4 w-4" />
@@ -592,6 +598,11 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Saved Replies */}
+        <TabsContent value="replies" className="mt-4">
+          <SavedRepliesTab />
         </TabsContent>
 
         {/* Billing */}

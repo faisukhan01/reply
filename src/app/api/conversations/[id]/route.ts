@@ -38,6 +38,24 @@ export async function GET(
     orderBy: { createdAt: "asc" },
   });
 
+  // Visitor stats: total conversations by this visitor + total messages
+  const visitorConversations = await db.conversation.count({
+    where: { visitorId: conv.visitorId, chatbotId: conv.chatbot.id },
+  });
+  const visitorMessages = await db.message.count({
+    where: { conversation: { visitorId: conv.visitorId, chatbotId: conv.chatbot.id } },
+  });
+
+  // Assigned agent info
+  let assignedAgent: { id: string; name: string; email: string } | null = null;
+  if (conv.assignedToId) {
+    const agent = await db.user.findUnique({
+      where: { id: conv.assignedToId },
+      select: { id: true, name: true, email: true },
+    });
+    assignedAgent = agent;
+  }
+
   return NextResponse.json({
     conversation: {
       id: conv.id,
@@ -47,6 +65,7 @@ export async function GET(
       status: conv.status,
       satisfaction: conv.satisfaction,
       assignedToId: conv.assignedToId,
+      assignedAgent,
       channel: conv.channel,
       summary: conv.summary,
       createdAt: conv.createdAt,
@@ -54,6 +73,11 @@ export async function GET(
       chatbot: {
         id: conv.chatbot.id,
         name: conv.chatbot.name,
+      },
+      visitor: {
+        totalConversations: visitorConversations,
+        totalMessages: visitorMessages,
+        firstSeen: conv.createdAt,
       },
     },
     messages,
