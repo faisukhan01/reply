@@ -3,9 +3,14 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Output to a fixed location so the client is always found by Vercel builds
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
+  // Default: SQLite for local development.
+  // For production on Vercel, switch to "postgresql" and set
+  // DATABASE_URL to your Postgres connection string, then run `prisma db push`.
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }

@@ -62,6 +62,7 @@ export async function GET(req: Request) {
         select: { content: true, role: true, createdAt: true },
       },
       _count: { select: { messages: true } },
+      tags: { include: { tag: { select: { id: true, name: true, color: true } } } },
     },
   });
 
@@ -86,6 +87,13 @@ export async function GET(req: Request) {
           }
         : null,
       messageCount: c._count.messages,
+      tags: c.tags
+        .map((l) => ({
+          id: l.tag.id,
+          name: l.tag.name,
+          color: l.tag.color,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     };
   });
 

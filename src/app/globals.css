@@ -459,3 +459,151 @@
   outline: none;
 }
 
+/* ─── Dashboard & Landing Polish Animations ─────────────────────── */
+
+/* Icon shimmer sweep — a diagonal light sweep that crosses every 3s */
+@keyframes icon-shimmer {
+  0%, 100% { background-position: -150% -150%; }
+  50% { background-position: 150% 150%; }
+}
+.animate-icon-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.animate-icon-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    transparent 30%,
+    oklch(1 0 0 / 18%) 50%,
+    transparent 70%
+  );
+  background-size: 200% 200%;
+  animation: icon-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Quick action card gradient border animation on hover */
+@keyframes gradient-border-rotate {
+  to { --angle: 360deg; }
+}
+.quick-action-card {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.quick-action-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    oklch(0.55 0.22 295),
+    oklch(0.65 0.2 330),
+    oklch(0.6 0.18 160),
+    oklch(0.55 0.22 295)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.quick-action-card:hover::before {
+  opacity: 1;
+  animation: gradient-border-rotate 3s linear infinite;
+}
+
+/* Arrow slide-right on hover */
+.quick-action-arrow {
+  transition: transform 0.2s ease;
+}
+.quick-action-card:hover .quick-action-arrow {
+  transform: translateX(3px);
+}
+
+/* Pricing card rotating conic gradient border on hover */
+.pricing-card-gradient {
+  position: relative;
+}
+.pricing-card-gradient::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    oklch(0.55 0.22 295),
+    oklch(0.65 0.2 330),
+    oklch(0.55 0.18 160),
+    oklch(0.65 0.15 70),
+    oklch(0.55 0.22 295)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.pricing-card-gradient:hover::before {
+  opacity: 1;
+  animation: gradient-border-rotate 4s linear infinite;
+}
+
+/* Floating particles for hero background */
+@keyframes float-up {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--particle-opacity, 0.3);
+  }
+  90% {
+    opacity: var(--particle-opacity, 0.3);
+  }
+  100% {
+    transform: translateY(-400px) translateX(var(--particle-drift, 20px));
+    opacity: 0;
+  }
+}
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  animation: float-up var(--particle-duration, 12s) linear infinite;
+  animation-delay: var(--particle-delay, 0s);
+  pointer-events: none;
+}
+
+/* CTA animated gradient background shift */
+@keyframes cta-gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-cta-gradient {
+  background-size: 200% 200%;
+  animation: cta-gradient-shift 10s ease infinite;
+}
+
+/* Dot pattern overlay for CTA section */
+.dot-pattern {
+  background-image: radial-gradient(circle, oklch(1 0 0 / 12%) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Live activity pulsing dot */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+.animate-live-pulse {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+

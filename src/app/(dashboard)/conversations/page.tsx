@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { io, type Socket } from "socket.io-client";
+import { type Socket } from "socket.io-client";
+import { connectRealtime, isRealtimeEnabled } from "@/lib/realtime";
 import { formatDistanceToNow, format, subDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { type DateRange } from "react-day-picker";
@@ -296,17 +297,11 @@ function msgTime(iso: string): string {
 }
 
 // ─── Realtime socket singleton ────────────────────────────────────
-let socketSingleton: Socket | null = null;
-function getSocket(): Socket {
-  if (socketSingleton) return socketSingleton;
-  socketSingleton = io("/?XTransformPort=3001", {
-    transports: ["websocket", "polling"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    timeout: 10000,
-  });
-  return socketSingleton;
+// Uses the centralized helper in @/lib/realtime which gracefully
+// degrades to polling when no socket.io server is available (e.g. Vercel).
+function getSocket(): Socket | null {
+  if (!isRealtimeEnabled()) return null;
+  return connectRealtime();
 }
 
 // ─── Component ────────────────────────────────────────────────────
@@ -471,6 +466,7 @@ export default function ConversationsPage() {
   useEffect(() => {
     const socket = getSocket();
     socketRef.current = socket;
+    if (!socket) return; // realtime disabled — polling fallback handles updates
 
     const onMessageNew = (payload: {
       conversationId: string;
