@@ -46,6 +46,9 @@ import {
   Settings2,
   ChevronsUpDown,
   Hash,
+  StickyNote,
+  Lock,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -100,6 +103,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -140,6 +144,15 @@ type Message = {
   role: "VISITOR" | "AI" | "AGENT";
   content: string;
   createdAt: string;
+};
+
+type Note = {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: string;
+  author: { id: string; name: string; email: string };
 };
 
 type ConversationDetail = {
@@ -341,6 +354,19 @@ export default function ConversationsPage() {
   // AI Reply Suggestions
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  // Internal Notes (private, team-only)
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [notesCollapsed, setNotesCollapsed] = useState(false);
+  const [confirmDeleteNoteId, setConfirmDeleteNoteId] = useState<string | null>(
+    null
+  );
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const notesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Canned responses
   const [canned, setCanned] = useState<
@@ -573,6 +599,10 @@ export default function ConversationsPage() {
       setSummary(null);
       setSuggestions([]);
       setShowSummary(false);
+      setNotes([]);
+      setNoteDraft("");
+      setShowNotes(false);
+      setConfirmDeleteNoteId(null);
       return;
     }
     let cancelled = false;
@@ -582,6 +612,9 @@ export default function ConversationsPage() {
     setSummary(null);
     setShowSummary(false);
     setSuggestions([]);
+    setNotes([]);
+    setNoteDraft("");
+    setConfirmDeleteNoteId(null);
     (async () => {
       try {
         const res = await fetch(`/api/conversations/${selectedId}`, {
@@ -618,6 +651,100 @@ export default function ConversationsPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, aiTyping]);
+
+  // ─── Notes: fetch when conversation is selected ────────────────
+  const fetchNotes = useCallback(async (convId: string) => {
+    setLoadingNotes(true);
+    try {
+      const res = await fetch(`/api/conversations/${convId}/notes`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotes(data.notes ?? []);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setNotes([]);
+      return;
+    }
+    void fetchNotes(selectedId);
+  }, [selectedId, fetchNotes]);
+
+  // Auto-scroll notes list to bottom when notes change.
+  useEffect(() => {
+    if (!showNotes) return;
+    notesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [notes, showNotes]);
+
+  // ─── Notes: create ──────────────────────────────────────────────
+  const addNote = useCallback(async () => {
+    const content = noteDraft.trim();
+    if (!content || !selectedId || savingNote) return;
+    setSavingNote(true);
+    const prevDraft = noteDraft;
+    setNoteDraft("");
+    try {
+      const res = await fetch(`/api/conversations/${selectedId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ?? "Failed to add note");
+        setNoteDraft(prevDraft);
+        return;
+      }
+      const data = await res.json();
+      const note = data.note as Note;
+      setNotes((prev) =>
+        prev.some((n) => n.id === note.id) ? prev : [...prev, note]
+      );
+      // Ensure the panel is expanded so the new note is visible.
+      setNotesCollapsed(false);
+    } catch {
+      toast.error("Failed to add note");
+      setNoteDraft(prevDraft);
+    } finally {
+      setSavingNote(false);
+    }
+  }, [noteDraft, selectedId, savingNote]);
+
+  // ─── Notes: delete ──────────────────────────────────────────────
+  const deleteNote = useCallback(
+    async (noteId: string) => {
+      if (!selectedId || deletingNoteId) return;
+      setDeletingNoteId(noteId);
+      setConfirmDeleteNoteId(null);
+      // Optimistically remove the note from the list.
+      const prevNotes = notes;
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      try {
+        const res = await fetch(
+          `/api/conversations/${selectedId}/notes/${noteId}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          toast.error(data?.error ?? "Failed to delete note");
+          setNotes(prevNotes);
+        }
+      } catch {
+        toast.error("Failed to delete note");
+        setNotes(prevNotes);
+      } finally {
+        setDeletingNoteId(null);
+      }
+    },
+    [selectedId, deletingNoteId, notes]
+  );
 
   // ─── Counts per tab ────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -1850,6 +1977,38 @@ export default function ConversationsPage() {
                             Generate an AI summary of this conversation
                           </TooltipContent>
                         </Tooltip>
+                        {/* Internal Notes toggle */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setShowNotes((v) => !v);
+                                if (!showNotes) setNotesCollapsed(false);
+                              }}
+                              className={cn(
+                                "gap-1.5 relative",
+                                showNotes &&
+                                  "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              )}
+                            >
+                              <StickyNote className="size-3.5" />
+                              <span className="hidden sm:inline">Notes</span>
+                              {notes.length > 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-0.5 h-4 min-w-4 px-1 text-[10px] tabular-nums bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30"
+                                >
+                                  {notes.length}
+                                </Badge>
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            View internal notes (private to your team)
+                          </TooltipContent>
+                        </Tooltip>
                         {detail.status !== "CLOSED" && (
                           <>
                             <Tooltip>
@@ -2020,6 +2179,275 @@ export default function ConversationsPage() {
                         </p>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Internal Notes panel (private, team-only) */}
+                {showNotes && detail && (
+                  <div className="border-b bg-amber-50/60 dark:bg-amber-950/20">
+                    <Collapsible
+                      open={!notesCollapsed}
+                      onOpenChange={(open) => setNotesCollapsed(!open)}
+                      className="w-full"
+                    >
+                      <div className="flex items-center gap-2 px-4 py-2.5">
+                        <CollapsibleTrigger asChild>
+                          <button
+                            className="flex items-center gap-2 flex-1 min-w-0 text-left group"
+                            aria-label={
+                              notesCollapsed
+                                ? "Expand notes"
+                                : "Collapse notes"
+                            }
+                          >
+                            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-900/40 dark:border-amber-700/50">
+                              <StickyNote className="size-3.5 text-amber-700 dark:text-amber-300" />
+                            </div>
+                            <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                              Internal Notes
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className="h-5 text-[10px] tabular-nums bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30"
+                            >
+                              {notes.length}
+                            </Badge>
+                            <ChevronRight
+                              className={cn(
+                                "size-3.5 text-amber-700/70 dark:text-amber-300/70 transition-transform",
+                                !notesCollapsed && "rotate-90"
+                              )}
+                            />
+                          </button>
+                        </CollapsibleTrigger>
+                        <div className="flex items-center gap-1.5 text-[10px] text-amber-700/80 dark:text-amber-300/80">
+                          <Lock className="size-3" />
+                          <span className="hidden sm:inline">
+                            Private — visible to team only
+                          </span>
+                          <span className="sm:hidden">Private</span>
+                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-7 text-amber-700/80 hover:bg-amber-100 hover:text-amber-800 dark:text-amber-300/80 dark:hover:bg-amber-900/40"
+                              onClick={() => setShowNotes(false)}
+                            >
+                              <X className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Hide notes panel</TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <CollapsibleContent>
+                        <div className="border-t border-amber-200/60 dark:border-amber-800/50 px-4 py-3 space-y-3">
+                          {/* Notes list */}
+                          {loadingNotes ? (
+                            <div className="space-y-2">
+                              {[0, 1].map((i) => (
+                                <div
+                                  key={i}
+                                  className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-3"
+                                >
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Skeleton className="size-6 rounded-full" />
+                                    <Skeleton className="h-3 w-24" />
+                                    <Skeleton className="h-3 w-16 ml-auto" />
+                                  </div>
+                                  <Skeleton className="h-3 w-full" />
+                                  <Skeleton className="h-3 w-5/6 mt-1.5" />
+                                </div>
+                              ))}
+                            </div>
+                          ) : notes.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center text-center py-6 px-4">
+                              <div className="size-10 rounded-xl bg-amber-100 border border-amber-200 dark:bg-amber-900/40 dark:border-amber-700/50 flex items-center justify-center mb-2">
+                                <StickyNote className="size-5 text-amber-600 dark:text-amber-300" />
+                              </div>
+                              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                                No notes yet
+                              </p>
+                              <p className="text-xs text-amber-800/70 dark:text-amber-200/70 mt-1 max-w-xs">
+                                Add a private note to share context,
+                                reminders, or handoff details with your team.
+                              </p>
+                            </div>
+                          ) : (
+                            <ScrollArea className="max-h-72 w-full">
+                              <div className="space-y-2 pr-1">
+                                <AnimatePresence initial={false}>
+                                  {notes.map((n) => {
+                                    const isConfirming =
+                                      confirmDeleteNoteId === n.id;
+                                    const isDeleting =
+                                      deletingNoteId === n.id;
+                                    return (
+                                      <motion.div
+                                        key={n.id}
+                                        layout
+                                        initial={{ opacity: 0, y: 12 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{
+                                          opacity: 0,
+                                          y: -8,
+                                          scale: 0.97,
+                                        }}
+                                        transition={{
+                                          type: "spring",
+                                          stiffness: 380,
+                                          damping: 30,
+                                        }}
+                                        className={cn(
+                                          "group relative rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-3 shadow-sm transition-transform",
+                                          "border-amber-200 dark:border-amber-900/60",
+                                          "hover:rotate-[-0.4deg] hover:-translate-y-px",
+                                          isDeleting && "opacity-50"
+                                        )}
+                                      >
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                          <div
+                                            className={cn(
+                                              "flex size-6 items-center justify-center rounded-full text-white text-[10px] font-semibold ring-2 ring-amber-300 dark:ring-amber-600/60",
+                                              avatarColor(n.author.name)
+                                            )}
+                                            title={n.author.email}
+                                          >
+                                            {initials(n.author.name)}
+                                          </div>
+                                          <span className="text-xs font-semibold text-amber-900 dark:text-amber-100 truncate">
+                                            {n.author.name}
+                                          </span>
+                                          <span className="text-[10px] text-amber-700/70 dark:text-amber-300/70 truncate">
+                                            {timeAgo(n.createdAt)}
+                                          </span>
+                                          <div className="ml-auto flex items-center gap-0.5">
+                                            {isConfirming ? (
+                                              <>
+                                                <span className="text-[10px] text-amber-800 dark:text-amber-200 mr-1 hidden sm:inline">
+                                                  Delete?
+                                                </span>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <button
+                                                      onClick={() =>
+                                                        void deleteNote(n.id)
+                                                      }
+                                                      disabled={!!deletingNoteId}
+                                                      className="rounded p-1 text-rose-600 hover:bg-rose-500/20 dark:text-rose-300 disabled:opacity-50"
+                                                      aria-label="Confirm delete note"
+                                                    >
+                                                      <Check className="size-3" />
+                                                    </button>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                    Confirm delete
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                                <button
+                                                  onClick={() =>
+                                                    setConfirmDeleteNoteId(null)
+                                                  }
+                                                  disabled={!!deletingNoteId}
+                                                  className="rounded p-1 text-amber-800/70 hover:bg-amber-200/60 dark:text-amber-200/70 dark:hover:bg-amber-900/40 disabled:opacity-50"
+                                                  aria-label="Cancel delete"
+                                                >
+                                                  <X className="size-3" />
+                                                </button>
+                                              </>
+                                            ) : (
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <button
+                                                    onClick={() =>
+                                                      setConfirmDeleteNoteId(
+                                                        n.id
+                                                      )
+                                                    }
+                                                    disabled={!!deletingNoteId}
+                                                    className="rounded p-1 text-amber-700/50 hover:bg-rose-500/15 hover:text-rose-600 dark:text-amber-300/50 dark:hover:text-rose-300 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:opacity-30"
+                                                    aria-label="Delete note"
+                                                  >
+                                                    <Trash2 className="size-3" />
+                                                  </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  Delete this note
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <p className="text-xs text-amber-900/90 dark:text-amber-100/90 leading-relaxed whitespace-pre-wrap break-words pr-1">
+                                          {n.content}
+                                        </p>
+                                      </motion.div>
+                                    );
+                                  })}
+                                </AnimatePresence>
+                                <div ref={notesEndRef} />
+                              </div>
+                            </ScrollArea>
+                          )}
+
+                          {/* Composer */}
+                          <div className="space-y-1.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-2">
+                            <Textarea
+                              value={noteDraft}
+                              onChange={(e) => setNoteDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (
+                                  e.key === "Enter" &&
+                                  (e.metaKey || e.ctrlKey)
+                                ) {
+                                  e.preventDefault();
+                                  void addNote();
+                                }
+                              }}
+                              placeholder="Add a private note for your team… (⌘+Enter to post)"
+                              rows={2}
+                              className="resize-none min-h-[44px] max-h-40 bg-white/80 dark:bg-background/60 border-amber-200/70 dark:border-amber-900/50 focus-visible:ring-amber-400/40 text-amber-950 dark:text-amber-50 placeholder:text-amber-700/50 dark:placeholder:text-amber-300/40"
+                            />
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 text-[10px] text-amber-700/80 dark:text-amber-300/70">
+                                <Lock className="size-3" />
+                                <span>Team only</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {noteDraft.length > 0 && (
+                                  <span
+                                    className={cn(
+                                      "text-[10px] font-mono tabular-nums",
+                                      noteDraft.length > 800
+                                        ? "text-rose-500"
+                                        : "text-amber-700/70 dark:text-amber-300/70"
+                                    )}
+                                  >
+                                    {noteDraft.length}
+                                  </span>
+                                )}
+                                <Button
+                                  size="sm"
+                                  onClick={() => void addNote()}
+                                  disabled={
+                                    !noteDraft.trim() || savingNote
+                                  }
+                                  className="gap-1.5 h-7 text-xs bg-amber-500 text-white hover:bg-amber-600 border-amber-400 dark:bg-amber-600 dark:hover:bg-amber-500"
+                                >
+                                  {savingNote ? (
+                                    <Clock className="size-3 animate-spin" />
+                                  ) : (
+                                    <Plus className="size-3" />
+                                  )}
+                                  Add note
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 )}
 

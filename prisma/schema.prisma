@@ -43,6 +43,7 @@ model User {
   accounts     Account[]
   sessions     Session[]
   assignedTo   Conversation[] @relation("AssignedAgent")
+  notes        Note[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -138,6 +139,7 @@ model Conversation {
   assignedTo   User?     @relation("AssignedAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages     Message[]
   tags         ConversationTag[]
+  notes        Note[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -149,6 +151,19 @@ model Message {
   role           String // VISITOR | AI | AGENT
   content        String
   createdAt      DateTime     @default(now())
+}
+
+// ─── Internal Notes (private, team-only) ──────────────────────────
+
+model Note {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 // ─── Contacts / Leads ─────────────────────────────────────────────

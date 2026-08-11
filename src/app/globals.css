@@ -607,3 +607,104 @@
   animation: live-pulse 2s ease-in-out infinite;
 }
 
+/* ─── Vercel-Ready Polish: Selection, Focus, Gradient Text ─────── */
+
+/* Custom text selection — brand purple */
+::selection {
+  background: oklch(0.65 0.25 310 / 30%);
+  color: inherit;
+}
+.dark ::selection {
+  background: oklch(0.7 0.28 310 / 40%);
+}
+
+/* Gradient text utility — reusable for headings */
+.text-gradient-brand {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.28 295) 0%,
+    oklch(0.6 0.3 320) 50%,
+    oklch(0.65 0.28 345) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Animated gradient text — shifts hue over 6s */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.text-gradient-animated {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.28 295),
+    oklch(0.6 0.3 320),
+    oklch(0.65 0.28 345),
+    oklch(0.6 0.3 320),
+    oklch(0.55 0.28 295)
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradient-shift 6s ease-in-out infinite;
+}
+
+/* Enhanced focus-visible — thick brand ring for keyboard users */
+:focus-visible {
+  outline: 2px solid oklch(0.65 0.25 310);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Glow card — soft purple glow on hover */
+.glow-card {
+  transition: box-shadow 0.4s ease, transform 0.3s ease;
+}
+.glow-card:hover {
+  box-shadow:
+    0 0 0 1px oklch(0.65 0.25 310 / 30%),
+    0 8px 32px oklch(0.65 0.25 310 / 15%);
+}
+
+/* Skeleton shimmer — for loading states */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.95 0.01 300) 25%,
+    oklch(0.9 0.02 300) 50%,
+    oklch(0.95 0.01 300) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.25 0.02 300) 25%,
+    oklch(0.3 0.03 300) 50%,
+    oklch(0.25 0.02 300) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* Reduced motion — respect user preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

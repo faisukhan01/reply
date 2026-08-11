@@ -1026,3 +1026,42 @@ ReplyAI was stable after round 4 (4 major features: webhook persistence, convers
 5. **Keyboard shortcuts enhancement**: Expand ⌘K command palette with more actions (assign, tag, close, export).
 6. **Mobile responsive improvements**: Test and fix any mobile layout issues across all pages.
 7. **Performance optimization**: Lazy load charts, debounce API calls, add loading skeletons everywhere.
+
+---
+Task ID: 6-A
+Agent: conversation-notes
+Task: Add internal notes feature to conversation inbox
+
+Work Log:
+- Read worklog.md, prisma/schema.prisma, lib/session.ts, existing conversation API routes, and the conversations page (3,015 lines) to understand existing patterns.
+- Added `Note` model to `prisma/schema.prisma` (id, conversationId, authorId, content, createdAt, updatedAt) with cascade-delete relations; added `notes Note[]` to both `Conversation` and `User` models.
+- Ran `bun run db:push` to apply schema and regenerate Prisma client (no data loss, demo DB intact).
+- Created `src/app/api/conversations/[id]/notes/route.ts`:
+  - `GET` → lists notes for a conversation sorted by `createdAt` asc, includes author {id, name, email}. Org-scoped ownership check via `getOwnedConversation`.
+  - `POST` → creates a note from `{ content }` body, sets `authorId` from `getCurrentUser()` session, bumps `conversation.updatedAt`. Validates content (non-empty, ≤4,000 chars). Returns the created note with author info.
+- Created `src/app/api/conversations/[id]/notes/[noteId]/route.ts`:
+  - `DELETE` → deletes a note. Authorization: only the note's author OR users with role `OWNER`/`ADMIN` may delete. Returns 403 otherwise. Verifies conversation belongs to the caller's org first.
+- Updated `src/app/(dashboard)/conversations/page.tsx`:
+  - Imported `StickyNote`, `Lock`, `ChevronRight` icons and the `ScrollArea` shadcn component.
+  - Added `Note` type + state (`notes`, `loadingNotes`, `noteDraft`, `savingNote`, `showNotes`, `notesCollapsed`, `confirmDeleteNoteId`, `deletingNoteId`, `notesEndRef`).
+  - Added `fetchNotes` effect that loads notes on conversation select; resets notes/draft/confirm state on conversation change/unselect.
+  - Added `addNote` (POST + optimistic append + auto-expand panel) and `deleteNote` (optimistic remove + revert on failure + toast) callbacks.
+  - Added a "Notes" toggle button in the conversation header next to the AI Summary button (amber-tinted when active, with count badge).
+  - Added a collapsible "Internal Notes" panel below the AI Summary panel (above the messages row), featuring:
+    - Collapsible header with sticky-note icon, count badge, "Private — visible to team only" label with Lock icon, and a hide-panel close button.
+    - Notes list inside a `ScrollArea` (max-h-72) with:
+      - Each note styled as a sticky note: `bg-amber-50 dark:bg-amber-950/30`, `border-amber-200 dark:border-amber-900/60`, subtle `hover:rotate-[-0.4deg] -translate-y-px` playful transform.
+      - Author avatar circle (initials, hashed color) wrapped in an `ring-amber-300` ring.
+      - Author name, relative timestamp (date-fns `formatDistanceToNow`), and whitespace-preserving content.
+      - Delete (trash) button per note, visible on hover, with an inline "Delete? ✓ ✕" confirmation flow + Tooltip.
+      - Empty state and loading skeleton states.
+      - Framer Motion `AnimatePresence` + `motion.div` with slide-in-from-bottom (y: 12 → 0) and exit animation.
+    - Composer at the bottom: amber-tinted `Textarea` (⌘+Enter to post) + "Add note" button with character counter, "Team only" lock label, and saving spinner.
+- Ran `bun run lint` → 0 errors. Ran `bunx tsc --noEmit` → 0 errors in any of the new/modified notes files (only pre-existing unrelated errors in other files).
+- Did NOT start the dev server (per task constraint).
+
+Stage Summary:
+- New `Note` model live in DB with proper cascade relations to `Conversation` and `User`.
+- Two new authenticated, org-scoped API endpoints: `GET/POST /api/conversations/[id]/notes` and `DELETE /api/conversations/[id]/notes/[noteId]` with author/admin authorization.
+- New collapsible "Internal Notes" UI in the inbox with sticky-note aesthetic (amber/yellow), count badge, framer-motion animations, optimistic create/delete with confirmation tooltip, and clear "Private — visible to team only" labeling. Lays out cleanly between the AI Summary panel and the messages row; hides entirely when toggled off.
+- 100% TypeScript, uses existing shadcn/ui components (Button, Textarea, ScrollArea, Badge, Tooltip, Collapsible, Skeleton) — zero new dependencies. Lint passes.
