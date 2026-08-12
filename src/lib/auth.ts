@@ -3,12 +3,53 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
+// On Vercel (serverless, HTTPS), we must trust the Host header and use
+// the __Secure- cookie prefix. These settings make NextAuth work on
+// Vercel without depending on NEXTAUTH_URL being perfectly configured.
+const isProduction = process.env.NODE_ENV === "production";
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   // Trust the Host header on Vercel so cookies/callbacks use the correct
-  // domain even when NEXTAUTH_URL is unset or stale. This is required for
-  // NextAuth v4 on serverless hosts.
+  // domain even when NEXTAUTH_URL is unset or stale.
   trustHost: true,
+  // Explicit cookie config — ensures the session cookie is set with the
+  // correct name (__Secure- prefix on HTTPS) and attributes on Vercel.
+  cookies: {
+    sessionToken: {
+      name: isProduction
+        ? "__Secure-next-auth.session-token"
+        : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
+    callbackUrl: {
+      name: isProduction
+        ? "__Secure-next-auth.callback-url"
+        : "next-auth.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
+    csrfToken: {
+      name: isProduction
+        ? "__Host-next-auth.csrf-token"
+        : "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
+  },
   pages: {
     signIn: "/login",
   },

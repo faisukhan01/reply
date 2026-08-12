@@ -33,25 +33,17 @@ export default function SignupPage() {
         setLoading(false);
         return;
       }
-      // auto sign-in
-      const r = await signIn("credentials", {
+      // auto sign-in with server-side redirect (bulletproof on Vercel)
+      await signIn("credentials", {
         email: form.email,
         password: form.password,
-        redirect: false,
+        redirect: true,
+        callbackUrl: "/dashboard",
       });
-      if (r?.error || !r?.ok) {
-        toast.success("Account created. Please sign in.");
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 400);
-      } else {
-        toast.success("Account created! Welcome to ReplyAI 🎉");
-        // Hard navigation so the new session cookie is sent on the next
-        // request. router.push can race with cookie propagation on Vercel.
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 400);
-      }
+      // If this returns, sign-in failed — redirect to login manually
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 300);
     } catch {
       toast.error("Something went wrong");
       setLoading(false);

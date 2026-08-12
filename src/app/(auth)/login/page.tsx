@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,7 +8,6 @@ import { Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 function LoginForm() {
@@ -17,32 +16,33 @@ function LoginForm() {
   const [email, setEmail] = useState("demo@replyai.app");
   const [password, setPassword] = useState("demo1234");
 
+  // If redirected back here with ?error=..., show a toast.
+  useEffect(() => {
+    const err = params.get("error");
+    if (err) {
+      toast.error("Invalid email or password. Please try again.");
+    }
+  }, [params]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const res = await signIn("credentials", {
+    // redirect: true → NextAuth does a FULL server-side redirect.
+    // The server sets the session cookie AND returns a 302 to /dashboard
+    // in the same response. The browser follows the redirect with the
+    // cookie already stored. No client-side race condition possible.
+    // This is the bulletproof approach for Vercel/serverless.
+    const callbackUrl = params.get("callbackUrl") || "/dashboard";
+    await signIn("credentials", {
       email,
       password,
-      redirect: false,
+      redirect: true,
+      callbackUrl,
     });
+    // If signIn returns (i.e., redirect didn't happen), credentials were wrong.
+    // NextAuth will have already redirected to /login?error=... in that case,
+    // but just in case:
     setLoading(false);
-    if (res?.error) {
-      toast.error("Invalid email or password");
-      return;
-    }
-    if (!res?.ok) {
-      toast.error("Sign-in failed. Please try again.");
-      return;
-    }
-    toast.success("Welcome back!");
-    // Hard navigation (not router.push) so the new session cookie is
-    // guaranteed to be sent with the next request. router.push can race
-    // with cookie propagation on serverless hosts (Vercel).
-    const callbackUrl = params.get("callbackUrl") || "/dashboard";
-    // Tiny delay lets the Set-Cookie response settle before navigation.
-    setTimeout(() => {
-      window.location.href = callbackUrl;
-    }, 200);
   }
 
   return (
