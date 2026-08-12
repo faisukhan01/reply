@@ -3,55 +3,16 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
-// On Vercel (serverless, HTTPS), we must trust the Host header and use
-// the __Secure- cookie prefix. These settings make NextAuth work on
-// Vercel without depending on NEXTAUTH_URL being perfectly configured.
-const isProduction = process.env.NODE_ENV === "production";
-
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   // Trust the Host header on Vercel so cookies/callbacks use the correct
-  // domain even when NEXTAUTH_URL is unset or stale.
+  // domain. This is the documented serverless approach for NextAuth v4.
+  // Combined with NEXTAUTH_URL env var (set on Vercel), this makes cookie
+  // domain + callback URL resolution work correctly.
   trustHost: true,
-  // Explicit cookie config — ensures the session cookie is set with the
-  // correct name (__Secure- prefix on HTTPS) and attributes on Vercel.
-  cookies: {
-    sessionToken: {
-      name: isProduction
-        ? "__Secure-next-auth.session-token"
-        : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: isProduction,
-      },
-    },
-    callbackUrl: {
-      name: isProduction
-        ? "__Secure-next-auth.callback-url"
-        : "next-auth.callback-url",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: isProduction,
-      },
-    },
-    csrfToken: {
-      name: isProduction
-        ? "__Host-next-auth.csrf-token"
-        : "next-auth.csrf-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: isProduction,
-      },
-    },
-  },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   providers: [
     CredentialsProvider({
@@ -110,5 +71,7 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
+  // CRITICAL: must be set. NextAuth throws "Server error" on /api/auth/error
+  // if this is missing or empty. Set NEXTAUTH_URL + NEXTAUTH_SECRET on Vercel.
   secret: process.env.NEXTAUTH_SECRET,
 };
