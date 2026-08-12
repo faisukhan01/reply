@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -37,6 +37,65 @@ export default function LoginPage() {
   }
 
   return (
+    <div className="w-full max-w-sm mx-auto py-10">
+      <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+      <p className="text-sm text-muted-foreground mt-1.5">
+        Sign in to your ReplyAI dashboard
+      </p>
+
+      <div className="mt-4 mb-6 rounded-lg border border-violet-200 bg-violet-50 dark:bg-violet-950/30 dark:border-violet-900 px-3 py-2.5 text-xs text-violet-700 dark:text-violet-300">
+        <span className="font-semibold">Demo account:</span> demo@replyai.app / demo1234
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
+              Forgot?
+            </button>
+          </div>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+          />
+        </div>
+        <Button type="submit" className="w-full h-10" disabled={loading}>
+          {loading ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</>
+          ) : (
+            <>Sign in <ArrowRight className="ml-2 h-4 w-4" /></>
+          )}
+        </Button>
+      </form>
+
+      <p className="text-sm text-muted-foreground text-center mt-6">
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className="text-violet-600 hover:underline font-medium">
+          Sign up free
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 grid lg:grid-cols-2">
         {/* Left: form */}
@@ -48,60 +107,14 @@ export default function LoginPage() {
             <span className="font-bold text-lg tracking-tight">ReplyAI</span>
           </Link>
 
-          <div className="w-full max-w-sm mx-auto py-10">
-            <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
-              Sign in to your ReplyAI dashboard
-            </p>
-
-            <div className="mt-4 mb-6 rounded-lg border border-violet-200 bg-violet-50 dark:bg-violet-950/30 dark:border-violet-900 px-3 py-2.5 text-xs text-violet-700 dark:text-violet-300">
-              <span className="font-semibold">Demo account:</span> demo@replyai.app / demo1234
+          <Suspense fallback={
+            <div className="w-full max-w-sm mx-auto py-10 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
             </div>
+          }>
+            <LoginForm />
+          </Suspense>
 
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
-                    Forgot?
-                  </button>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-              </div>
-              <Button type="submit" className="w-full h-10" disabled={loading}>
-                {loading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</>
-                ) : (
-                  <>Sign in <ArrowRight className="ml-2 h-4 w-4" /></>
-                )}
-              </Button>
-            </form>
-
-            <p className="text-sm text-muted-foreground text-center mt-6">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="text-violet-600 hover:underline font-medium">
-                Sign up free
-              </Link>
-            </p>
-          </div>
           <div className="text-xs text-muted-foreground text-center mt-auto">
             © {new Date().getFullYear()} ReplyAI
           </div>
