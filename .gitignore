@@ -65,4 +65,4 @@ server.log
 
 # mini-service build artifacts
 mini-services/*/node_modules/
-mini-services/*/dist/
+mini-services/*/dist/upload/

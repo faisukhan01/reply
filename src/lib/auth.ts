@@ -5,6 +5,10 @@ import { db } from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
+  // Trust the Host header on Vercel so cookies/callbacks use the correct
+  // domain even when NEXTAUTH_URL is unset or stale. This is required for
+  // NextAuth v4 on serverless hosts.
+  trustHost: true,
   pages: {
     signIn: "/login",
   },

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Loader2, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -41,13 +39,18 @@ export default function SignupPage() {
         password: form.password,
         redirect: false,
       });
-      if (r?.error) {
-        toast.error("Account created. Please sign in.");
-        router.push("/login");
+      if (r?.error || !r?.ok) {
+        toast.success("Account created. Please sign in.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 400);
       } else {
         toast.success("Account created! Welcome to ReplyAI 🎉");
-        router.push("/dashboard");
-        router.refresh();
+        // Hard navigation so the new session cookie is sent on the next
+        // request. router.push can race with cookie propagation on Vercel.
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 400);
       }
     } catch {
       toast.error("Something went wrong");

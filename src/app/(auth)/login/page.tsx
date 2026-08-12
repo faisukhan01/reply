@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("demo@replyai.app");
@@ -31,9 +30,19 @@ function LoginForm() {
       toast.error("Invalid email or password");
       return;
     }
+    if (!res?.ok) {
+      toast.error("Sign-in failed. Please try again.");
+      return;
+    }
     toast.success("Welcome back!");
-    router.push(params.get("callbackUrl") || "/dashboard");
-    router.refresh();
+    // Hard navigation (not router.push) so the new session cookie is
+    // guaranteed to be sent with the next request. router.push can race
+    // with cookie propagation on serverless hosts (Vercel).
+    const callbackUrl = params.get("callbackUrl") || "/dashboard";
+    // Tiny delay lets the Set-Cookie response settle before navigation.
+    setTimeout(() => {
+      window.location.href = callbackUrl;
+    }, 200);
   }
 
   return (
