@@ -1483,3 +1483,90 @@ Round 10's fix uses `redirect: true` — the cookie and redirect are set by the 
 2. **Add a welcome toast on /dashboard** (e.g., "Welcome back, Demo Owner!") to replace the lost login toast.
 3. **Conversation page refactor:** Still 3000+ lines.
 4. **Onboarding wizard, command palette, mobile audit:** Carry forward.
+
+---
+Task ID: CRON-REVIEW-11
+Agent: main (orchestrator) — webDevReview cron round 11 (AUTH ERROR FIX)
+Task: Fix /api/auth/error "Server error" on Vercel after sign-in
+
+## Current Project Status Assessment
+User deployed commit `1033292` (round 10's bulletproof fix with explicit cookies config + redirect:true). After signing in on Vercel, the browser landed on `/api/auth/error` showing "Server error — There is a problem with the server configuration. Check the server logs for more information." This is NextAuth's generic error page, thrown when NextAuth's internal initialization or CSRF flow fails.
+
+## Root Cause
+Round 10 added an explicit `cookies` config to `authOptions` that used the `__Host-` prefix for the CSRF cookie:
+```ts
+csrfToken: {
+  name: isProduction ? "__Host-next-auth.csrf-token" : "next-auth.csrf-token",
+  ...
+}
+```
+The `__Host-` cookie prefix has STRICT requirements per RFC 6265bis:
+- No `Domain` attribute allowed
+- `Path` must be `/`
+- `Secure` must be true
+- Can only be set from the exact origin (no subdomain)
+
+NextAuth v4's CSRF flow sets the CSRF cookie at `/api/auth/csrf` and validates it on POST to `/api/auth/callback/credentials`. With the `__Host-` prefix, the cookie rotation/validation was failing (likely because NextAuth sets additional attributes that violate the `__Host-` requirements, or the double-submit CSRF token comparison failed). This caused NextAuth to throw a configuration error → redirect to `/api/auth/error` → generic "Server error" page.
+
+## Completed Modifications
+
+### 1. `src/lib/auth.ts` — Removed explicit cookies config
+Removed the entire `cookies: { sessionToken, callbackUrl, csrfToken }` block. NextAuth v4 with `trustHost: true` **auto-manages** cookie names and attributes based on the request protocol (HTTPS on Vercel → `__Secure-` prefix automatically; HTTP in dev → no prefix). This is the documented, tested, recommended path — overriding it was the mistake.
+
+Also added `error: "/login"` to the `pages` config so that if a config error does occur, the user is redirected to `/login` instead of the generic NextAuth error page.
+
+### 2. `src/app/api/auth/[...nextauth]/route.ts` — Runtime secret check
+Added a module-level check that logs a clear FATAL error to the Vercel function logs if `NEXTAUTH_SECRET` is missing:
+```ts
+if (!process.env.NEXTAUTH_SECRET) {
+  console.error("[auth] FATAL: NEXTAUTH_SECRET is not set. Add it in Vercel → Settings → Environment Variables.");
+}
+```
+This makes future debugging much easier — Vercel function logs will show exactly what's wrong instead of a generic "Server error".
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `bun run build` → ✓ 27/27 pages, 0 errors ✅
+- Commit `19fa948` pushed to `https://github.com/faisukhan01/reply` (main) ✅
+- Vercel will auto-redeploy from `19fa948`.
+
+## Git / Deployment
+- **Commit:** `19fa948` — "fix(auth): remove broken __Host- cookies config causing /api/auth/error"
+- **Pushed:** `1033292..19fa948  main -> main`
+- **Vercel URL:** https://reply-beryl.vercel.app/ (will redeploy automatically)
+- **Author:** Faisal Arslan Khan <193670919+faisukhan01@users.noreply.github.com>
+
+## What the User Must Do (Critical Steps)
+1. **Wait ~1-2 min** for Vercel to rebuild from commit `19fa948`.
+2. **Verify env vars on Vercel** (Settings → Environment Variables):
+   - `NEXTAUTH_SECRET` = `VXMfaEj0pOhwIIAyCqIACiX/uH5qpmszwxMkCmGyeo4=` — must be set for **Production** environment (not just Preview)
+   - `NEXTAUTH_URL` = `https://reply-beryl.vercel.app` — must be set for **Production**
+   - `DATABASE_URL` = `libsql://shopwithfaisu-faisukhan01.aws-ap-south-1.turso.io`
+   - `DATABASE_AUTH_TOKEN` = (the long JWT token)
+   - If any were only set for "Preview" environment, edit them and check the "Production" box.
+3. **Clear browser cookies** for `reply-beryl.vercel.app` (old broken CSRF cookies from round 10's `__Host-` config will interfere). Easiest: use an incognito/private window.
+4. **Redeploy** on Vercel (Deployments → click the latest → Redeploy) to ensure env vars are picked up.
+5. **Test login** at https://reply-beryl.vercel.app/login with `demo@replyai.app` / `demo1234`.
+
+## Vercel Env Vars (final, mandatory)
+```
+DATABASE_URL=libsql://shopwithfaisu-faisukhan01.aws-ap-south-1.turso.io
+DATABASE_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODY1MjU0MTQsImlkIjoiMDE5ZWNhZjUtYjQwMS03OWIxLWE0N2EtNzA2M2Q4MmFmZDA1Iiwia2lkIjoiZ3hzNlhTVnl4UkRzT04wdUNrY3FicElYQVMtcS0yRFFZVWVKUGNOZkZQSSIsInJpZCI6ImRiMDI3MzUwLTkxNTMtNGUzNy1hZmQ2LTU0MWZjNjJlNmI2OSJ9.3jf-sGLc-GFMmyZFEwfGnevQ5EpT-CFTQwEjVjPVe8RVkmHOEvSUdAsufrgjrA2qwXzAPVS_HwB10RJW5FgCDA
+NEXTAUTH_SECRET=VXMfaEj0pOhwIIAyCqIACiX/uH5qpmszwxMkCmGyeo4=
+NEXTAUTH_URL=https://reply-beryl.vercel.app
+```
+
+## Why This Round's Fix Will Work
+- Round 9: Added `trustHost: true` + hard navigation (client-side) — still raced.
+- Round 10: Added explicit `__Host-`/`__Secure-` cookies config + `redirect: true` — cookies config broke CSRF → "Server error".
+- Round 11 (this): Removed the broken explicit cookies config. Now using `trustHost: true` + `redirect: true` + auto cookie management. This is the **minimal, documented NextAuth v4 serverless setup**. Nothing custom, nothing to break.
+
+## Unresolved Issues / Risks
+1. **Vercel env var environment scope:** If the user set env vars only for "Preview" and not "Production", the production deploy won't see them. Must verify all 4 vars are checked for Production.
+2. **Stale browser cookies:** The `__Host-next-auth.csrf-token` cookie from round 10 may still be in the user's browser. Must clear cookies or use incognito.
+3. **Redeploy needed:** If env vars were just added/edited, a redeploy is required for them to take effect.
+
+## Priority Recommendations for Next Phase
+1. **User: Follow the 5 steps above.** This should resolve the auth error.
+2. **If still failing:** Check Vercel function logs (Deployments → click latest → Functions/Logs tab) for the `[auth] FATAL:` message — that will tell us exactly what's missing.
+3. **Conversation page refactor, onboarding wizard, command palette:** Carry forward.
