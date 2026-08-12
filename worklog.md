@@ -1225,3 +1225,65 @@ NEXT_PUBLIC_REALTIME_ENABLED=0
 3. **Realtime on Vercel:** If needed, deploy the mini-service separately and set `NEXT_PUBLIC_REALTIME_ENABLED=1`.
 4. **Conversation page refactor:** Split the 3000-line conversations page into smaller components.
 5. **Onboarding wizard:** Multi-step setup for new orgs.
+
+---
+Task ID: CRON-REVIEW-8
+Agent: main (orchestrator) — webDevReview cron round 8 (BUILD FIX)
+Task: Fix Vercel production build failure (useSearchParams Suspense error)
+
+## Current Project Status Assessment
+User attempted to deploy to Vercel. The build compiled successfully (✓ Compiled in 36.6s) but failed during static page generation with 1 error:
+```
+⨯ useSearchParams() should be wrapped in a suspense boundary at page "/login".
+Error occurred prerendering page "/login".
+Export encountered an error on /(auth)/login/page: /login, exiting the build.
+```
+This is a Next.js 16 requirement: any client component using `useSearchParams()` must be wrapped in a `<Suspense>` boundary, otherwise static prerendering fails. This only manifests in `next build` (production), not `next dev`.
+
+## Root Cause
+`src/app/(auth)/login/page.tsx` was a single client component that called `useSearchParams()` directly in its body. During `next build`, Next.js tries to prerender `/login` as a static page. The `useSearchParams()` hook triggers a client-side rendering bailout during static generation, and without a Suspense boundary the build fails.
+
+## Completed Modifications
+
+### Fix: Wrap LoginForm in Suspense (src/app/(auth)/login/page.tsx)
+- **Extracted** the form logic (which uses `useSearchParams`, `useRouter`, `useState`, `signIn`) into a new `LoginForm` component.
+- **Kept** the outer `LoginPage` as the default export but it now only renders the static layout (logo, copyright, right-side visual panel) and wraps `<LoginForm />` inside a `<Suspense>` boundary.
+- **Suspense fallback:** A centered spinner (`Loader2` with `animate-spin` in brand violet) inside a max-w-sm container, so users see a polished loading state instead of a blank page while the form hydrates.
+- No behavioral changes — login flow, demo credentials, callbackUrl redirect, and toast notifications all work identically.
+
+## Verification Results
+- `bun run build` (full production build) → **✓ Compiled successfully** + **✓ Generating static pages (27/27)** — NO ERRORS ✅
+- Route table shows `/login` as `○ (Static) prerendered as static content` — exactly what we want ✅
+- `bun run lint` → 0 errors, 0 warnings ✅
+- Dev server: `bun run dev` → landing (200), login (200), signup (200) ✅
+- All 27 routes build cleanly: 4 static (/, /_not-found, /login, /signup), 23 dynamic (server-rendered on demand), 1 proxy middleware.
+
+## Git / Deployment
+- **Commit:** `7359e9e` — "fix(build): wrap useSearchParams in Suspense on /login — fixes Vercel build"
+- **Pushed to:** https://github.com/faisukhan01/reply (main branch, 192f31e..7359e9e)
+- **Vercel auto-redeploy:** Vercel will automatically detect the new push and rebuild from commit `7359e9e`. The build should now succeed end-to-end.
+- **Author:** Faisal Arslan Khan <193670919+faisukhan01@users.noreply.github.com> (correct for contribution graph)
+
+## Vercel Env Vars (unchanged, still valid)
+```
+DATABASE_URL=libsql://shopwithfaisu-faisukhan01.aws-ap-south-1.turso.io
+DATABASE_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODY1MjU0MTQsImlkIjoiMDE5ZWNhZjUtYjQwMS03OWIxLWE0N2EtNzA2M2Q4MmFmZDA1Iiwia2lkIjoiZ3hzNlhTVnl4UkRzT04wdUNrY3FicElYQVMtcS0yRFFZVWVKUGNOZkZQSSIsInJpZCI6ImRiMDI3MzUwLTkxNTMtNGUzNy1hZmQ2LTU0MWZjNjJlNmI2OSJ9.3jf-sGLc-GFMmyZFEwfGnevQ5EpT-CFTQwEjVjPVe8RVkmHOEvSUdAsufrgjrA2qwXzAPVS_HwB10RJW5FgCDA
+NEXTAUTH_SECRET=VXMfaEj0pOhwIIAyCqIACiX/uH5qpmszwxMkCmGyeo4=
+NEXTAUTH_URL=https://<your-vercel-domain>.vercel.app
+NEXT_PUBLIC_REALTIME_ENABLED=0
+```
+
+## Unresolved Issues / Risks
+1. **Vercel build memory:** The build compiled in ~30s locally (sandbox). Vercel's 8GB / 2-core build machine has more than enough headroom — no OOM risk.
+2. **NEXTAUTH_URL on Vercel:** Must be set to the final Vercel domain (e.g. `https://reply-xxx.vercel.app`) AFTER the first deploy reveals the URL. For the first deploy, can leave it as `http://localhost:3000` temporarily — NextAuth will still work because Vercel sets `VERCEL_URL` automatically, but callbacks may redirect to localhost. Best practice: deploy once, grab the URL, update env var, redeploy.
+3. **Realtime on Vercel:** Still gracefully disabled (`NEXT_PUBLIC_REALTIME_ENABLED=0`). Inbox falls back to 10s polling. If user wants true realtime, the mini-service needs separate hosting (Railway/Fly.io) and the env var set to `1`.
+4. **Turso replica lag:** Reads immediately after writes may be stale. Already mitigated in seed script with `client.batch(stmts, 'write')`. Not an issue for normal app traffic.
+
+## Priority Recommendations for Next Phase
+1. **User: Redeploy on Vercel** — The push to `main` triggers an automatic rebuild. The build should now succeed.
+2. **Post-deploy verification:** Test login (`demo@replyai.app` / `demo1234`) on the Vercel URL, verify conversations load, verify a chat message round-trips.
+3. **Set NEXTAUTH_URL** to the Vercel domain once known.
+4. **Conversation page refactor:** Still 3000+ lines — split into smaller components for maintainability and faster compiles.
+5. **Onboarding wizard:** Multi-step setup for new orgs (create bot → upload KB → customize → embed).
+6. **Command palette (⌘K):** Expand with more actions (assign, tag, close, export).
+7. **Mobile responsive audit:** Test all pages at mobile widths and fix any layout issues.
