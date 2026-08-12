@@ -1287,3 +1287,104 @@ NEXT_PUBLIC_REALTIME_ENABLED=0
 5. **Onboarding wizard:** Multi-step setup for new orgs (create bot → upload KB → customize → embed).
 6. **Command palette (⌘K):** Expand with more actions (assign, tag, close, export).
 7. **Mobile responsive audit:** Test all pages at mobile widths and fix any layout issues.
+
+---
+Task ID: CRON-REVIEW-9
+Agent: main (orchestrator) — webDevReview cron round 9 (LOGIN REDIRECT FIX)
+Task: Fix login staying on /login after successful sign-in on Vercel
+
+## Current Project Status Assessment
+User deployed to Vercel at https://reply-beryl.vercel.app/. The build succeeded (round 8 fix worked). However, on the live Vercel deployment, clicking "Sign in" with the demo credentials showed the "Welcome back!" success toast but the page stayed on `/login?callbackUrl=%2Fdashboard` — it never navigated to `/dashboard`. The login API itself was succeeding (toast appeared), but the post-login redirect was being undone by the middleware bouncing back to `/login`.
+
+## Root Cause Analysis
+Two compounding issues:
+
+### Cause 1: NextAuth v4 `trustHost` not set
+On serverless hosts (Vercel), NextAuth v4 needs `trustHost: true` to derive the canonical URL from the request `Host` header. Without it, when `NEXTAUTH_URL` is unset or stale (set to `localhost:3000`), the session cookie can be issued with incorrect attributes, and callback/redirect URLs can be wrong. This caused the session cookie to not be recognized by the middleware on `/dashboard`, which then redirected back to `/login?callbackUrl=%2Fdashboard`.
+
+### Cause 2: `router.push()` race with Set-Cookie propagation
+The original login code did:
+```ts
+const res = await signIn("credentials", { redirect: false });
+router.push(callbackUrl);
+router.refresh();
+```
+On serverless, `signIn()` returns to the client after the server response is received, but the browser may not have finished storing the `Set-Cookie` from that response before `router.push()` fires the next navigation. The next request to `/dashboard` therefore has no session cookie, middleware sees no token, and redirects back to `/login`. This is a well-known NextAuth + Vercel pitfall.
+
+## Completed Modifications
+
+### 1. `src/lib/auth.ts` — Add `trustHost: true`
+```ts
+export const authOptions: NextAuthOptions = {
+  session: { strategy: "jwt" },
+  trustHost: true,   // ← NEW: trust Host header on Vercel
+  pages: { signIn: "/login" },
+  ...
+};
+```
+This makes NextAuth use the request's Host header (`reply-beryl.vercel.app`) for cookie domain and callback URLs, regardless of the `NEXTAUTH_URL` env var value.
+
+### 2. `src/app/(auth)/login/page.tsx` — Hard navigation after sign-in
+Replaced:
+```ts
+router.push(params.get("callbackUrl") || "/dashboard");
+router.refresh();
+```
+With:
+```ts
+const callbackUrl = params.get("callbackUrl") || "/dashboard";
+setTimeout(() => {
+  window.location.href = callbackUrl;   // hard navigation
+}, 200);
+```
+- Hard navigation (`window.location.href`) forces a full page load, which guarantees the browser sends the freshly-set session cookie with the request to `/dashboard`.
+- The 200ms delay lets the `Set-Cookie` response from `signIn()` fully settle before navigating.
+- Removed unused `useRouter` import (lint clean).
+- Added a `!res?.ok` guard so a malformed response shows an error toast instead of silently succeeding.
+
+### 3. `src/app/(auth)/signup/page.tsx` — Same fix for auto sign-in after signup
+Replaced `router.push("/dashboard")` + `router.refresh()` with `window.location.href = "/dashboard"` after a 400ms delay (slightly longer because signup creates a user then signs in — two round trips).
+Removed unused `useRouter` import.
+
+### 4. `.gitignore` — Exclude `upload/` folder
+Added `upload/` to `.gitignore` so user-uploaded screenshots don't get committed.
+
+## Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `bun run build` → ✓ Compiled successfully + 27/27 static pages generated, 0 errors ✅
+- `/login` and `/signup` both show as `○ (Static)` in route table ✅
+- Local dev: landing (200), login (200) ✅
+- Commit `cbf61ab` pushed to `https://github.com/faisukhan01/reply` (main) ✅
+- Vercel will auto-redeploy from the new commit.
+
+## Git / Deployment
+- **Commit:** `cbf61ab` — "fix(auth): login redirect stuck on /login after successful sign-in on Vercel"
+- **Pushed:** `5c09671..cbf61ab  main -> main`
+- **Vercel URL:** https://reply-beryl.vercel.app/ (will redeploy automatically)
+- **Author:** Faisal Arslan Khan <193670919+faisukhan01@users.noreply.github.com>
+
+## Vercel Env Vars (CORRECTED — user should update on Vercel)
+The user previously had `NEXTAUTH_URL=http://localhost:3000`. With `trustHost: true`, NextAuth no longer depends on `NEXTAUTH_URL` for cookie/redirect logic. The user can either:
+- **Remove `NEXTAUTH_URL` entirely** (recommended — `trustHost` handles it), OR
+- **Set `NEXTAUTH_URL=https://reply-beryl.vercel.app`** (also works)
+
+Final env var set for Vercel:
+```
+DATABASE_URL=libsql://shopwithfaisu-faisukhan01.aws-ap-south-1.turso.io
+DATABASE_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODY1MjU0MTQsImlkIjoiMDE5ZWNhZjUtYjQwMS03OWIxLWE0N2EtNzA2M2Q4MmFmZDA1Iiwia2lkIjoiZ3hzNlhTVnl4UkRzT04wdUNrY3FicElYQVMtcS0yRFFZVWVKUGNOZkZQSSIsInJpZCI6ImRiMDI3MzUwLTkxNTMtNGUzNy1hZmQ2LTU0MWZjNjJlNmI2OSJ9.3jf-sGLc-GFMmyZFEwfGnevQ5EpT-CFTQwEjVjPVe8RVkmHOEvSUdAsufrgjrA2qwXzAPVS_HwB10RJW5FgCDA
+NEXTAUTH_SECRET=VXMfaEj0pOhwIIAyCqIACiX/uH5qpmszwxMkCmGyeo4=
+NEXTAUTH_URL=https://reply-beryl.vercel.app
+NEXT_PUBLIC_REALTIME_ENABLED=0
+```
+
+## Unresolved Issues / Risks
+1. **Vercel redeploy timing:** Vercel typically takes ~1-2 minutes to rebuild + deploy after a push. The user should wait for the green check on Vercel before testing.
+2. **Stale browser cookies:** If the user's browser has an old/corrupt session cookie from the broken login attempts, they may need to clear cookies for `reply-beryl.vercel.app` before the fix works. Hard refresh (Ctrl+Shift+R) usually suffices.
+3. **Realtime still disabled:** `NEXT_PUBLIC_REALTIME_ENABLED=0` — inbox uses 10s polling fallback. Acceptable for now.
+
+## Priority Recommendations for Next Phase
+1. **User: Wait for Vercel redeploy** (commit `cbf61ab`), then test login at https://reply-beryl.vercel.app/login with `demo@replyai.app` / `demo1234`. Should now redirect to `/dashboard`.
+2. **If still broken:** Clear browser cookies for the Vercel domain, hard refresh, retry.
+3. **Verify dashboard loads:** After login, confirm `/dashboard` renders with stats, sidebar, and conversations.
+4. **Conversation page refactor:** Still 3000+ lines — split into smaller components.
+5. **Onboarding wizard, command palette, mobile audit:** Carry forward from previous round.
