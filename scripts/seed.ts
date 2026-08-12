@@ -1,7 +1,25 @@
+import { config } from "dotenv";
+// Load .env FIRST, before any Prisma imports, and override stale shell env vars.
+config({ override: true });
+
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 import bcrypt from "bcryptjs";
 
-const db = new PrismaClient();
+// Connect to Turso (libSQL) using the driver adapter.
+// Falls back to local SQLite if DATABASE_URL is not a libsql:// URL.
+function createPrismaClient() {
+  const url = process.env.DATABASE_URL;
+  const token = process.env.DATABASE_AUTH_TOKEN;
+  console.log("[seed] Connecting to:", url?.substring(0, 50));
+  if (url?.startsWith("libsql:") || url?.startsWith("http")) {
+    const adapter = new PrismaLibSql({ url, authToken: token });
+    return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
+  }
+  return new PrismaClient();
+}
+
+const db = createPrismaClient();
 
 const VISITOR_NAMES = [
   "Ayesha Khan", "Bilal Ahmed", "Fatima Noor", "Usman Tariq", "Zainab Ali",

@@ -1,16 +1,18 @@
 // ReplyAI — AI Customer Support Automation Platform
 // Multi-tenant schema: Organizations -> Users + Chatbots -> Conversations -> Messages
+//
+// Database: Turso (libSQL) — SQLite-compatible, edge-deployed.
+// Connection is handled via the @prisma/adapter-libsql driver adapter
+// (see src/lib/db.ts). The schema provider stays "sqlite" because
+// Turso speaks the SQLite wire protocol.
 
 generator client {
-  provider = "prisma-client-js"
-  // Output to a fixed location so the client is always found by Vercel builds
-  output   = "../node_modules/.prisma/client"
+  provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/client"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  // Default: SQLite for local development.
-  // For production on Vercel, switch to "postgresql" and set
-  // DATABASE_URL to your Postgres connection string, then run `prisma db push`.
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }

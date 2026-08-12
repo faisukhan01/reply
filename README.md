@@ -128,51 +128,44 @@ In the Vercel project settings → **Environment Variables**, add:
 
 | Variable | Value | Notes |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://...` | **Required for production.** See below. |
+| `DATABASE_URL` | `libsql://your-db.turso.io` | **Required.** Your Turso database URL. |
+| `DATABASE_AUTH_TOKEN` | `eyJhbGci...` | **Required.** Your Turso auth token. |
 | `NEXTAUTH_SECRET` | (random 32+ char string) | Generate with `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | `https://your-app.vercel.app` | Your Vercel deployment URL |
 | `NEXT_PUBLIC_REALTIME_ENABLED` | `0` | Disable Socket.io (no mini-service on Vercel). The app uses polling fallback. |
 
-### 4. Database — choose one option
+### 4. Database — Turso (libSQL)
 
-#### Option A: PostgreSQL (recommended for production)
+This project uses **Turso** as its database — a SQLite-compatible edge
+database that works perfectly with Vercel's serverless functions.
 
-Vercel serverless functions have an ephemeral filesystem — **SQLite data
-will not persist** between invocations. For production, use Postgres.
+The Prisma schema uses `provider = "sqlite"` with the
+`@prisma/adapter-libsql` driver adapter (configured in `src/lib/db.ts`).
+No schema changes needed — it just works.
 
-1. Provision a Postgres database:
-   - [Neon](https://neon.tech/) (free tier, recommended)
-   - [Supabase](https://supabase.com/) (free tier)
-   - [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres)
-2. In `prisma/schema.prisma`, change:
-   ```prisma
-   datasource db {
-     provider = "postgresql"   // was "sqlite"
-     url      = env("DATABASE_URL")
-   }
+#### Already set up
+
+The database is already provisioned and seeded with demo data:
+- **Database URL:** `libsql://shopwithfaisu-faisukhan01.aws-ap-south-1.turso.io`
+- **Demo login:** `demo@replyai.app` / `demo1234`
+
+#### If you want to create a fresh Turso database
+
+1. Go to <https://turso.tech> and create a free account.
+2. Create a database:
+   ```bash
+   turso db create replyai
+   turso db tokens create replyai
    ```
-3. Set `DATABASE_URL` to your Postgres connection string in Vercel env vars.
-4. Push the schema locally:
+3. Set the `DATABASE_URL` and `DATABASE_AUTH_TOKEN` env vars in Vercel.
+4. Push the schema:
    ```bash
    bun run db:push
    ```
-5. (Optional) Seed:
+5. Seed:
    ```bash
    bun run seed
    ```
-
-#### Option B: SQLite (demo only — data is ephemeral)
-
-If you just want to see it run on Vercel without setting up Postgres:
-
-1. Set `DATABASE_URL="file:/tmp/custom.db"` in Vercel env vars.
-2. Add a build script override (Vercel → Settings → Build & Development
-   Settings → Build Command):
-   ```
-   prisma db push --accept-data-loss && next build
-   ```
-3. The database is recreated on each cold start. **Data will be lost.**
-   This is fine for a quick demo but not for real use.
 
 ### 5. Deploy
 

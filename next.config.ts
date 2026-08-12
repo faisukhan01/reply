@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Allow agent-browser / preview proxies to access the dev server.
+  allowedDevOrigins: ["http://127.0.0.1:3000", "http://localhost:3000"],
 };
 
 export default nextConfig;
