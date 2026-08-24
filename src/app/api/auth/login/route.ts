@@ -21,16 +21,9 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // Check NEXTAUTH_SECRET first — surface a clear 500 message if it's missing.
-  // This is the #1 cause of opaque 500s on Vercel: the env var is not set
-  // for the "Production" environment.
-  if (!process.env.NEXTAUTH_SECRET) {
-    console.error("[auth/login] FATAL: NEXTAUTH_SECRET is not set in the environment.");
-    return NextResponse.json(
-      { error: "Server is missing NEXTAUTH_SECRET. Add it in Vercel → Settings → Environment Variables (Production)." },
-      { status: 500 }
-    );
-  }
+  // Note: NEXTAUTH_SECRET has a code-level fallback in src/lib/jwt.ts
+  // for when Vercel dashboard env vars are missing. We don't check it
+  // here — the secret is always available to signSession().
 
   let body: unknown;
   try {
