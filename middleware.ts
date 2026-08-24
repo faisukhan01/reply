@@ -6,12 +6,15 @@
  *
  * This replaces NextAuth's withAuth() — same protection, no NextAuth v4
  * initialization issues that broke on Vercel.
+ *
+ * IMPORTANT: imports verifySession from src/lib/jwt.ts so it uses the SAME
+ * secret/fallback as the login route. Otherwise middleware would reject
+ * cookies that the login route issued.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { verifySession, sessionCookieName } from "@/lib/jwt";
 
-const COOKIE_NAME = "replyai.session";
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/conversations",
@@ -22,16 +25,6 @@ const PROTECTED_PREFIXES = [
   "/widget-demo",
 ];
 
-function getSecret(): Uint8Array {
-  const raw = process.env.NEXTAUTH_SECRET;
-  if (!raw) {
-    // Without a secret we can't verify tokens. Treat as "no session"
-    // by throwing — middleware catches and redirects to /login.
-    throw new Error("NEXTAUTH_SECRET missing");
-  }
-  return new TextEncoder().encode(raw);
-}
-
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -40,18 +33,11 @@ export async function middleware(req: NextRequest) {
   );
   if (!isProtected) return NextResponse.next();
 
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-  let ok = false;
-  if (token) {
-    try {
-      await jwtVerify(token, getSecret(), { algorithms: ["HS256"] });
-      ok = true;
-    } catch {
-      ok = false;
-    }
-  }
-
-  if (!ok) {
+  const token = req.cookies.get(sessionCookieName)?.value;
+  // verifySession returns null on invalid/expired/missing tokens.
+  // It uses the same secret (or fallback) as the login route.
+  const payload = await verifySession(token);
+  if (!payload) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("callbackUrl", req.nextUrl.pathname + req.nextUrl.search);
