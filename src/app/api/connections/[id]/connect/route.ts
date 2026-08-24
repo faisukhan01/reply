@@ -1,12 +1,12 @@
 /**
- * GET /api/connections/[platform]/connect
+ * GET /api/connections/[id]/connect
  *
  * Initiates the OAuth flow for the given platform. Issues a signed state
  * token, persists it briefly (in a signed cookie so it survives the
  * redirect), and redirects to the platform's authorize URL.
  *
  * For non-OAuth platforms (e.g. WhatsApp), this endpoint is unused —
- * the client UI POSTs credentials directly to /api/connections/[platform]/connect
+ * the client UI POSTs credentials directly to /api/connections/[id]/connect
  * instead. See the POST handler below.
  */
 
@@ -17,9 +17,10 @@ import { issueState } from "@/lib/platforms/_state";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ platform: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { platform } = await params;
+  const { id } = await params;
+  const platform = id;
 
   let user;
   try {
@@ -85,7 +86,7 @@ export async function GET(
 }
 
 /**
- * POST /api/connections/[platform]/connect
+ * POST /api/connections/[id]/connect
  *
  * For non-OAuth platforms (WhatsApp). Body: { accessToken, phoneNumberId, ... }
  * Validates the credentials by calling getAccountInfo, then creates a
@@ -99,9 +100,10 @@ import { encryptToken } from "@/lib/platforms/_crypto";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ platform: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { platform } = await params;
+  const { id } = await params;
+  const platform = id;
 
   let user;
   try {

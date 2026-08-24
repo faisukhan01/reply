@@ -1,5 +1,5 @@
 /**
- * GET /api/connections/[platform]/callback
+ * GET /api/connections/[id]/callback
  *
  * OAuth callback handler. Verifies the state token, exchanges the code
  * for an access token, fetches the account info, and persists the
@@ -17,9 +17,10 @@ import { encryptToken } from "@/lib/platforms/_crypto";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ platform: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { platform } = await params;
+  const { id } = await params;
+  const platform = id;
   const { searchParams } = req.nextUrl;
   const code = searchParams.get("code");
   const state = searchParams.get("state");
