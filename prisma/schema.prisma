@@ -30,6 +30,8 @@ model Organization {
   cannedResponses CannedResponse[]
   webhooks        Webhook[]
   tags            Tag[]
+  connections     PlatformConnection[]
+  scheduledMessages ScheduledMessage[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -46,6 +48,8 @@ model User {
   sessions     Session[]
   assignedTo   Conversation[] @relation("AssignedAgent")
   notes        Note[]
+  connections     PlatformConnection[]
+  scheduledMessages ScheduledMessage[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -229,4 +233,60 @@ model ConversationTag {
   assignedAt     DateTime     @default(now())
 
   @@unique([conversationId, tagId])
+}
+
+// ─── Multi-Platform Scheduler ────────────────────────────────────
+// Stores OAuth tokens for each connected platform (Facebook, Instagram,
+// WhatsApp, LinkedIn, etc.). Tokens are encrypted at rest by the app
+// layer (src/lib/platforms/_crypto.ts) before being persisted here.
+
+model PlatformConnection {
+  id               String   @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId           String   // the user who authorized the connection
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform         String   // FACEBOOK | INSTAGRAM | WHATSAPP | LINKEDIN | TWITTER | EMAIL
+  accountId        String   // platform-side account id (page id, ig user id, waba id, etc.)
+  accountName      String   // human-readable (e.g. "Acme Inc. Facebook Page")
+  accountHandle    String?  // optional (e.g. "@acme")
+  accessTokenEnc   String   // encrypted access token
+  refreshTokenEnc  String?  // encrypted refresh token (if platform supports)
+  tokenExpiresAt   DateTime?
+  scopes           String   // JSON-encoded array of granted scopes
+  status           String   @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED | PENDING
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  scheduledMessages ScheduledMessage[]
+
+  @@unique([orgId, platform, accountId])
+  @@index([orgId, platform])
+  @@index([status])
+}
+
+model ScheduledMessage {
+  id               String   @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId           String   // the user who created the scheduled message
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectionId     String
+  connection       PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  platform         String   // denormalized for fast querying (matches connection.platform)
+  recipientId      String?  // platform-side recipient id (psid, ig user id, wa phone, li person urn)
+  recipientHandle String?  // human-readable recipient (e.g. "@jane", "+1...555")
+  content          String   // the message body (plain text or platform-formatted)
+  mediaUrl        String?
+  scheduledFor     DateTime // when to dispatch
+  status           String   @default("PENDING") // PENDING | QUEUED | SENT | FAILED | CANCELLED
+  attempts         Int      @default(0)
+  lastError        String?
+  sentAt           DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([orgId, status])
+  @@index([status, scheduledFor])
+  @@index([connectionId])
 }

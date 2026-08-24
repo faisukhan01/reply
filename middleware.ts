@@ -23,6 +23,8 @@ const PROTECTED_PREFIXES = [
   "/analytics",
   "/settings",
   "/widget-demo",
+  "/scheduler",
+  "/connections",
 ];
 
 export async function middleware(req: NextRequest) {
@@ -56,5 +58,7 @@ export const config = {
     "/analytics/:path*",
     "/settings/:path*",
     "/widget-demo/:path*",
+    "/scheduler/:path*",
+    "/connections/:path*",
   ],
 };
