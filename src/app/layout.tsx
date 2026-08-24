@@ -1,32 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/*
+ * Typography — Inter, single weight family for the whole product.
+ * One sans for everything (body, headings, UI), no display font.
+ * Numbers use tabular variants via the .tabular-nums utility.
+ */
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "ReplyAI — AI Customer Support Automation Platform",
+  title: "ReplyAI — Customer Support & Multi-Platform Scheduler",
   description:
-    "Deploy an AI support agent that answers your customers 24/7. Upload your knowledge base, embed a widget, and let ReplyAI handle the conversations.",
+    "ReplyAI is a customer support platform and multi-platform message scheduler. Connect Facebook, Instagram, WhatsApp, and LinkedIn — schedule messages, automate responses, and track analytics from one dashboard.",
   keywords: [
-    "AI chatbot",
+    "message scheduler",
+    "social media automation",
     "customer support",
-    "automation",
-    "SaaS",
-    "live chat",
-    "AI agent",
+    "Facebook scheduler",
+    "Instagram scheduler",
+    "WhatsApp Business",
+    "LinkedIn automation",
+    "AI chatbot",
   ],
   authors: [{ name: "ReplyAI" }],
 };
@@ -39,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${inter.variable} antialiased bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
@@ -49,7 +52,7 @@ export default function RootLayout({
         >
           <Providers>{children}</Providers>
           <Toaster />
-          <SonnerToaster richColors position="top-right" />
+          <SonnerToaster position="top-right" />
         </ThemeProvider>
       </body>
     </html>

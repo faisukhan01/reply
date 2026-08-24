@@ -3,7 +3,7 @@
 import { useState, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,6 @@ function LoginForm() {
   const [email, setEmail] = useState("demo@replyai.app");
   const [password, setPassword] = useState("demo1234");
 
-  // If redirected back here with ?error=..., show a toast.
   useEffect(() => {
     const err = params.get("error");
     if (err) {
@@ -28,15 +27,6 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
 
-    // We POST credentials directly to /api/auth/login. The server:
-    //   1. Validates email/password against the DB
-    //   2. Signs a JWT and sets it as an HTTP-only cookie in the SAME response
-    //   3. Returns the user JSON
-    // We then redirect to /dashboard. The cookie is already in the browser,
-    // so the middleware on /dashboard will see it and let us through.
-    //
-    // This is bulletproof on Vercel — no race condition, no client-side
-    // cookie handling, no NextAuth v4 / Next.js 16 incompatibilities.
     const callbackUrl = params.get("callbackUrl") || "/dashboard";
     try {
       const res = await fetch("/api/auth/login", {
@@ -50,16 +40,8 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      // Success — server has set the session cookie. Redirect.
-      // Use window.location for a full navigation so the new cookie is
-      // sent with the request to /dashboard.
       router.push(callbackUrl);
-      // Force a full reload to /dashboard so middleware sees the cookie.
-      // (router.push sometimes renders client-side without re-evaluating
-      // middleware — window.location guarantees the cookie is sent.)
-      setTimeout(() => {
-        window.location.href = callbackUrl;
-      }, 50);
+      setTimeout(() => { window.location.href = callbackUrl; }, 50);
     } catch (err) {
       toast.error("Something went wrong. Please try again.");
       setLoading(false);
@@ -67,19 +49,20 @@ function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm mx-auto py-10">
-      <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-      <p className="text-sm text-muted-foreground mt-1.5">
-        Sign in to your ReplyAI dashboard
+    <div className="w-full max-w-sm">
+      <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Sign in to your ReplyAI dashboard.
       </p>
 
-      <div className="mt-4 mb-6 rounded-lg border border-violet-200 bg-violet-50 dark:bg-violet-950/30 dark:border-violet-900 px-3 py-2.5 text-xs text-violet-700 dark:text-violet-300">
-        <span className="font-semibold">Demo account:</span> demo@replyai.app / demo1234
+      <div className="mt-5 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">Demo account:</span>{" "}
+        demo@replyai.app / demo1234
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email" className="text-sm">Email</Label>
           <Input
             id="email"
             type="email"
@@ -87,11 +70,12 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
+            className="h-10"
           />
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-sm">Password</Label>
             <button type="button" className="text-xs text-muted-foreground hover:text-foreground">
               Forgot?
             </button>
@@ -103,20 +87,21 @@ function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            className="h-10"
           />
         </div>
         <Button type="submit" className="w-full h-10" disabled={loading}>
           {loading ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</>
           ) : (
-            <>Sign in <ArrowRight className="ml-2 h-4 w-4" /></>
+            <>Sign in <ArrowRight className="ml-1.5 h-4 w-4" /></>
           )}
         </Button>
       </form>
 
-      <p className="text-sm text-muted-foreground text-center mt-6">
+      <p className="mt-6 text-sm text-muted-foreground text-center">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="text-violet-600 hover:underline font-medium">
+        <Link href="/signup" className="text-foreground font-medium hover:underline">
           Sign up free
         </Link>
       </p>
@@ -126,59 +111,42 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-1 grid lg:grid-cols-2">
-        {/* Left: form */}
-        <div className="flex flex-col p-6 md:p-10">
-          <Link href="/" className="flex items-center gap-2.5 mb-auto">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-lg shadow-violet-500/30">
-              <Sparkles className="h-5 w-5" />
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Top bar */}
+      <header className="border-b">
+        <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-md bg-foreground flex items-center justify-center">
+              <span className="text-background text-xs font-semibold">R</span>
             </div>
-            <span className="font-bold text-lg tracking-tight">ReplyAI</span>
+            <span className="font-semibold tracking-tight">ReplyAI</span>
           </Link>
-
-          <Suspense fallback={
-            <div className="w-full max-w-sm mx-auto py-10 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
-            </div>
-          }>
-            <LoginForm />
-          </Suspense>
-
-          <div className="text-xs text-muted-foreground text-center mt-auto">
-            © {new Date().getFullYear()} ReplyAI
+          <div className="text-sm text-muted-foreground">
+            New here?{" "}
+            <Link href="/signup" className="text-foreground font-medium hover:underline">
+              Create an account
+            </Link>
           </div>
         </div>
+      </header>
 
-        {/* Right: visual */}
-        <div className="hidden lg:flex relative items-center justify-center bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-12 overflow-hidden">
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="relative max-w-md text-white space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
-              Trusted by 5,000+ businesses
-            </div>
-            <h2 className="text-4xl font-bold leading-tight">
-              Automate your support. Delight your customers.
-            </h2>
-            <p className="text-white/80 text-lg">
-              ReplyAI answers 85% of questions instantly — so your team can focus on the conversations that truly need a human.
-            </p>
-            <div className="space-y-3 pt-4">
-              {[
-                "AI trained on your knowledge base",
-                "Live inbox with human handoff",
-                "Real-time analytics & insights",
-              ].map((t) => (
-                <div key={t} className="flex items-center gap-3 text-sm">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">✓</div>
-                  {t}
-                </div>
-              ))}
-            </div>
+      {/* Form */}
+      <main className="flex-1 flex items-center justify-center px-6 py-12">
+        <Suspense fallback={
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
+        }>
+          <LoginForm />
+        </Suspense>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t">
+        <div className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted-foreground text-center">
+          © {new Date().getFullYear()} ReplyAI · Customer support & multi-platform scheduler
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
