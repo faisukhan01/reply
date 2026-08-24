@@ -1648,3 +1648,68 @@ session using `jose` (edge-compatible, already used by NextAuth transitively).
    - Set DATABASE_URL, DATABASE_AUTH_TOKEN, NEXTAUTH_SECRET in
      Vercel → Settings → Environment Variables → Production
    - Redeploy
+
+---
+Task ID: REDESIGN-1
+Agent: main (orchestrator)
+Task: Full UI redesign + Multi-platform scheduler infrastructure
+
+## Phase 1: UI Redesign (commit e3f88e1)
+- Replaced globals.css: stripped all "agentic" effects (gradients, glow,
+  glassmorphism, particles, shimmer, animated borders). New palette: warm
+  greys + ink foreground, single emerald accent for positive states only.
+  Typography: switched from Geist to Inter (single weight family). Type
+  hierarchy carries the design — no color or motion for decoration.
+- Rewrote landing page (src/app/page.tsx): removed Hero3D (Three.js),
+  removed all gradient text/CTA gradient borders, removed animated stats.
+  New hero is minimal: inline-pill status, large headline, two CTAs.
+  Stripe/Linear aesthetic.
+- Rewrote auth pages (login + signup): removed violet/fuchsia gradient
+  right-side panels. Single-column centered form on clean white.
+- Rewrote sidebar: 240px wide, flat active-state pill (no framer-motion
+  animated bar). New sections include Workspace (Overview/Inbox/Scheduler/
+  Connections), Manage (AI Chatbot/Contacts), Insights (Analytics),
+  Configuration (Widget demo/Settings).
+- Rewrote topbar: removed ThemeToggle, NotificationsBell, CommandPalette,
+  bot status badge. Clean breadcrumb + user dropdown only.
+
+## Phase 2: Scheduler Infrastructure (commit 32c94ad)
+### Database schema
+- PlatformConnection: stores OAuth tokens (AES-256-GCM encrypted at rest)
+  for each connected platform. Unique on (orgId, platform, accountId).
+- ScheduledMessage: stores scheduled messages with status tracking
+  (PENDING/QUEUED/SENT/FAILED/CANCELLED), attempts counter, lastError,
+  sentAt. Indexed on (status, scheduledFor) for fast cron queries.
+
+### Platform adapter framework (src/lib/platforms/)
+- PlatformAdapter interface — adapters implement getAuthorizeUrl,
+  exchangeCodeForToken, getAccountInfo, sendMessage, refreshToken,
+  validateEnvConfig.
+- AES-256-GCM token encryption (encryptToken / decryptToken).
+- HMAC-signed OAuth state tokens (issueState / verifyState) for CSRF.
+- Adapters implemented: Facebook, Instagram, WhatsApp, LinkedIn.
+
+### API routes
+- /api/connections (GET, POST) — list + status
+- /api/connections/[platform]/connect (GET for OAuth, POST for WhatsApp)
+- /api/connections/[platform]/callback (GET OAuth callback)
+- /api/connections/[id] (GET, DELETE)
+- /api/scheduler (GET, POST, PATCH, DELETE)
+- /api/scheduler/dispatch (POST, cron-triggered)
+
+### Dashboard pages
+- /scheduler: composer + list of scheduled messages with status badges
+- /connections: list of available platforms with connect/disconnect UI
+
+### Cron
+- vercel.json adds a cron entry: POST /api/scheduler/dispatch every 5 min
+- Auth via x-cron-secret header matching CRON_SECRET env var
+- Dispatch loop: picks due messages, calls adapter.sendMessage(), updates
+  status with retry logic (3 attempts max, retryable errors stay PENDING)
+
+## To Activate Each Platform
+Set in Vercel → Settings → Environment Variables:
+- Facebook + Instagram: FACEBOOK_APP_ID, FACEBOOK_APP_SECRET
+- LinkedIn: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET
+- Cron: CRON_SECRET (any random string)
+- WhatsApp: no server env vars — user provides token via dialog
