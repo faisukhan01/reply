@@ -12,6 +12,7 @@ export type PlatformId =
   | "INSTAGRAM"
   | "WHATSAPP"
   | "LINKEDIN"
+  | "GOOGLE"
   | "TWITTER"
   | "EMAIL";
 

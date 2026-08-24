@@ -24,15 +24,23 @@ import {
   Plus,
   Sparkles,
   Search,
+  Zap,
+  Plug,
+  Calendar,
+  HelpCircle,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
 const NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Navigation" },
   { label: "Inbox", href: "/conversations", icon: MessageSquare, group: "Navigation" },
+  { label: "Automation", href: "/automation", icon: Zap, group: "Navigation" },
+  { label: "Scheduler", href: "/scheduler", icon: Calendar, group: "Navigation" },
+  { label: "Connections", href: "/connections", icon: Plug, group: "Navigation" },
   { label: "AI Chatbot Builder", href: "/chatbot", icon: Bot, group: "Navigation" },
   { label: "Contacts", href: "/contacts", icon: Users, group: "Navigation" },
   { label: "Analytics", href: "/analytics", icon: BarChart3, group: "Navigation" },
+  { label: "Setup Guide", href: "/automation-guide", icon: HelpCircle, group: "Navigation" },
   { label: "Widget Demo", href: "/widget-demo", icon: Code2, group: "Navigation" },
   { label: "Settings", href: "/settings", icon: Settings, group: "Navigation" },
 ];
@@ -78,6 +86,14 @@ export function CommandPalette() {
             <CommandItem onSelect={() => run(() => router.push("/conversations"))}>
               <MessageSquare className="mr-2 h-4 w-4" />
               <span>Open live inbox</span>
+            </CommandItem>
+            <CommandItem onSelect={() => run(() => router.push("/automation"))}>
+              <Zap className="mr-2 h-4 w-4" />
+              <span>Create an automation rule</span>
+            </CommandItem>
+            <CommandItem onSelect={() => run(() => router.push("/automation-guide"))}>
+              <HelpCircle className="mr-2 h-4 w-4" />
+              <span>How to connect platforms</span>
             </CommandItem>
             <CommandItem onSelect={() => run(() => router.push("/chatbot"))}>
               <Bot className="mr-2 h-4 w-4" />

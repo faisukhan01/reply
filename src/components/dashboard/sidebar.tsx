@@ -13,6 +13,8 @@ import {
   Code2,
   Calendar,
   Plug,
+  Zap,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +28,7 @@ type NavItem = {
 const nav: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, section: "Main" },
   { href: "/conversations", label: "Inbox", icon: MessageSquare, section: "Main" },
+  { href: "/automation", label: "Automation", icon: Zap, section: "Main" },
   { href: "/scheduler", label: "Scheduler", icon: Calendar, section: "Main" },
   { href: "/connections", label: "Connections", icon: Plug, section: "Main" },
 
@@ -34,6 +37,7 @@ const nav: NavItem[] = [
 
   { href: "/analytics", label: "Analytics", icon: BarChart3, section: "Insights" },
 
+  { href: "/automation-guide", label: "Setup Guide", icon: HelpCircle, section: "Config" },
   { href: "/widget-demo", label: "Widget demo", icon: Code2, section: "Config" },
   { href: "/settings", label: "Settings", icon: Settings, section: "Config" },
 ];

@@ -15,12 +15,14 @@ import { facebook } from "./facebook";
 import { instagram } from "./instagram";
 import { whatsapp } from "./whatsapp";
 import { linkedin } from "./linkedin";
+import { google } from "./google";
 
 export const platforms: Record<PlatformId, PlatformAdapter> = {
   FACEBOOK: facebook,
   INSTAGRAM: instagram,
   WHATSAPP: whatsapp,
   LINKEDIN: linkedin,
+  GOOGLE: google,
   // Future platforms (placeholders for the registry; the adapter is
   // imported lazily only when these are needed):
   TWITTER: undefined as unknown as PlatformAdapter,

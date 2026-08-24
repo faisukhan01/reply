@@ -32,6 +32,7 @@ model Organization {
   tags            Tag[]
   connections     PlatformConnection[]
   scheduledMessages ScheduledMessage[]
+  automationRules AutomationRule[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -289,4 +290,56 @@ model ScheduledMessage {
   @@index([orgId, status])
   @@index([status, scheduledFor])
   @@index([connectionId])
+}
+
+// ─── Automation Rules Engine ─────────────────────────────────────
+// Rules let users define "When [trigger] on [platform], if [condition],
+// then [action]". Triggers fire from inbound webhooks (FB/IG/WA/Google).
+// Actions can be: AI_REPLY (generate + send), CANNED_REPLY (send fixed
+// message), ESCALATE (mark conversation for human), NOTIFY (push to inbox),
+// SCHEDULE_FOLLOWUP (enqueue a ScheduledMessage N minutes later).
+
+model AutomationRule {
+  id               String   @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name             String
+  status           String   @default("ACTIVE") // ACTIVE | PAUSED | DRAFT
+  triggerPlatform  String   // FACEBOOK | INSTAGRAM | WHATSAPP | LINKEDIN | GOOGLE | WEB
+  triggerEvent     String   // MESSAGE_RECEIVED | COMMENT_RECEIVED | MENTION | EMAIL_RECEIVED | CALENDAR_STARTING
+  conditions       String   // JSON: [{ "field": "text", "op": "contains", "value": "pricing" }, ...]
+  actionType       String   // AI_REPLY | CANNED_REPLY | ESCALATE | NOTIFY | SCHEDULE_FOLLOWUP
+  actionConfig     String   // JSON: { "persona": "professional", "cannedId": "...", "delayMin": 30, "escalateTo": "..." }
+  priority         Int      @default(100) // higher = evaluated first
+  matchedCount     Int      @default(0)
+  lastMatchedAt    DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  logs             AutomationLog[]
+
+  @@index([orgId, status, triggerPlatform, triggerEvent])
+  @@index([orgId, status])
+}
+
+model AutomationLog {
+  id               String   @id @default(cuid())
+  orgId            String
+  ruleId           String
+  rule             AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  triggerPlatform  String
+  triggerEvent     String
+  // Snapshot of the inbound payload that fired (PSID, message text, etc.).
+  // Truncated to 500 chars per field to limit PII retention.
+  inboundSummary   String
+  actionType       String
+  outcome          String   @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  outboundPreview  String?  // first 200 chars of generated/sent reply
+  errorMessage     String?
+  latencyMs       Int?
+  createdAt        DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([ruleId, createdAt])
+  @@index([outcome])
 }
