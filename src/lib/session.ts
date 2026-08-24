@@ -1,31 +1,33 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+/**
+ * Server-side session helpers — drop-in replacement for the old
+ * NextAuth-based getCurrentUser()/requireUser().
+ *
+ * All API routes that previously called getCurrentUser() / requireUser()
+ * still work — they now read the JWT cookie directly via jose, no NextAuth.
+ */
+
 import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { getCurrentSessionUser, type SessionUser } from "@/lib/auth";
 
-export type SessionUser = {
-  id: string;
-  email: string;
-  name: string;
-  orgId: string;
-  orgSlug: string;
-  orgName: string;
-  role: string;
-};
+export type { SessionUser };
 
+/** Get the current logged-in user, or null if unauthenticated. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  return session.user as unknown as SessionUser;
+  return await getCurrentSessionUser();
 }
 
+/** Require a logged-in user — redirects to /login if not. */
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   return user;
 }
 
-/** Get the user's primary chatbot (auto-creates one on first org login). */
+/**
+ * Get the user's primary chatbot (auto-creates one on first org login).
+ * Kept here so existing API routes that import { getOrgChatbot } keep working.
+ */
 export async function getOrgChatbot(orgId: string) {
   let bot = await db.chatbot.findFirst({
     where: { orgId },

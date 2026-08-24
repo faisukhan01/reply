@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, Suspense, useEffect } from "react";
-import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { toast } from "sonner";
 
 function LoginForm() {
   const params = useSearchParams();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("demo@replyai.app");
   const [password, setPassword] = useState("demo1234");
@@ -27,22 +27,43 @@ function LoginForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // redirect: true → NextAuth does a FULL server-side redirect.
-    // The server sets the session cookie AND returns a 302 to /dashboard
-    // in the same response. The browser follows the redirect with the
-    // cookie already stored. No client-side race condition possible.
-    // This is the bulletproof approach for Vercel/serverless.
+
+    // We POST credentials directly to /api/auth/login. The server:
+    //   1. Validates email/password against the DB
+    //   2. Signs a JWT and sets it as an HTTP-only cookie in the SAME response
+    //   3. Returns the user JSON
+    // We then redirect to /dashboard. The cookie is already in the browser,
+    // so the middleware on /dashboard will see it and let us through.
+    //
+    // This is bulletproof on Vercel — no race condition, no client-side
+    // cookie handling, no NextAuth v4 / Next.js 16 incompatibilities.
     const callbackUrl = params.get("callbackUrl") || "/dashboard";
-    await signIn("credentials", {
-      email,
-      password,
-      redirect: true,
-      callbackUrl,
-    });
-    // If signIn returns (i.e., redirect didn't happen), credentials were wrong.
-    // NextAuth will have already redirected to /login?error=... in that case,
-    // but just in case:
-    setLoading(false);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Invalid email or password.");
+        setLoading(false);
+        return;
+      }
+      // Success — server has set the session cookie. Redirect.
+      // Use window.location for a full navigation so the new cookie is
+      // sent with the request to /dashboard.
+      router.push(callbackUrl);
+      // Force a full reload to /dashboard so middleware sees the cookie.
+      // (router.push sometimes renders client-side without re-evaluating
+      // middleware — window.location guarantees the cookie is sent.)
+      setTimeout(() => {
+        window.location.href = callbackUrl;
+      }, 50);
+    } catch (err) {
+      toast.error("Something went wrong. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (

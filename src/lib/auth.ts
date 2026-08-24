@@ -1,77 +1,96 @@
-import type { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+/**
+ * Auth helpers — replaces NextAuth v4 layer.
+ *
+ * Why we removed NextAuth:
+ * - NextAuth v4 (4.24.x) has known initialization issues on Next.js 16
+ *   in production serverless (Vercel). The `/api/auth/providers` route
+ *   returns HTTP 500 with "There is a problem with the server configuration."
+ *   caused by NextAuth's internal CSRF/host resolution flow.
+ * - Auth.js v5 (next-auth@beta) would fix it but requires a big refactor
+ *   of route handlers and types.
+ * - We use Credentials provider only — no OAuth, no magic links, no email.
+ *   A minimal custom JWT cookie session is simpler and bulletproof.
+ *
+ * This module is edge-compatible (uses `jose`) and is safe to import from
+ * both the Node route handlers in src/app/api/ and the edge middleware
+ * in src/middleware.ts.
+ */
+
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import {
+  signSession,
+  verifySession,
+  sessionCookieName,
+  sessionDurationSec,
+  type SessionUser,
+} from "@/lib/jwt";
 
-export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },
-  // Trust the Host header on Vercel so cookies/callbacks use the correct
-  // domain. This is the documented serverless approach for NextAuth v4.
-  // Combined with NEXTAUTH_URL env var (set on Vercel), this makes cookie
-  // domain + callback URL resolution work correctly.
-  trustHost: true,
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
-  providers: [
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+export { signSession, verifySession, sessionCookieName, sessionDurationSec };
+export type { SessionUser };
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
-          include: { org: true },
-        });
-        if (!user) return null;
+const isProduction = process.env.NODE_ENV === "production";
 
-        const valid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        );
-        if (!valid) return null;
+/** Validate email/password and return the user record (without passwordHash). */
+export async function authenticateUser(
+  email: string,
+  password: string
+): Promise<SessionUser | null> {
+  const user = await db.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+    include: { org: true },
+  });
+  if (!user) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          // custom fields passed via JWT
-          orgId: user.orgId,
-          orgSlug: user.org.slug,
-          orgName: user.org.name,
-          role: user.role,
-        } as any;
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = (user as any).id;
-        token.orgId = (user as any).orgId;
-        token.orgSlug = (user as any).orgSlug;
-        token.orgName = (user as any).orgName;
-        token.role = (user as any).role;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).orgId = token.orgId;
-        (session.user as any).orgSlug = token.orgSlug;
-        (session.user as any).orgName = token.orgName;
-        (session.user as any).role = token.role;
-      }
-      return session;
-    },
-  },
-  // CRITICAL: must be set. NextAuth throws "Server error" on /api/auth/error
-  // if this is missing or empty. Set NEXTAUTH_URL + NEXTAUTH_SECRET on Vercel.
-  secret: process.env.NEXTAUTH_SECRET,
-};
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    orgId: user.orgId,
+    orgSlug: user.org.slug,
+    orgName: user.org.name,
+    role: user.role,
+  };
+}
+
+/** Set the session cookie on a NextResponse (used by /api/auth/login). */
+export function setSessionCookie(res: NextResponse, token: string): void {
+  res.cookies.set({
+    name: sessionCookieName,
+    value: token,
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax",
+    path: "/",
+    maxAge: sessionDurationSec,
+  });
+}
+
+/** Clear the session cookie on a NextResponse (used by /api/auth/logout). */
+export function clearSessionCookie(res: NextResponse): void {
+  res.cookies.set({
+    name: sessionCookieName,
+    value: "",
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
+/** Read the current session user from the request cookies (server-side). */
+export async function getCurrentSessionUser(): Promise<SessionUser | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(sessionCookieName)?.value;
+  const payload = await verifySession(token);
+  if (!payload) return null;
+  // Strip iat/exp — caller only wants the user fields.
+  const { iat: _iat, exp: _exp, ...user } = payload;
+  return user;
+}

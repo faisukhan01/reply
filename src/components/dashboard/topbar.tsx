@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   Menu,
   LogOut,
@@ -53,6 +53,7 @@ const mobileNav = [
 
 export function Topbar({ userName, orgName }: { userName: string; orgName: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [botStatus, setBotStatus] = useState<"ACTIVE" | "PAUSED" | null>(null);
 
@@ -198,7 +199,11 @@ export function Topbar({ userName, orgName }: { userName: string; orgName: strin
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-rose-600 focus:text-rose-600"
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              router.push("/login");
+              setTimeout(() => { window.location.href = "/login"; }, 50);
+            }}
           >
             <LogOut className="mr-2 h-4 w-4" /> Sign out
           </DropdownMenuItem>

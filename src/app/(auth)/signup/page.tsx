@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Sparkles, Loader2, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -22,6 +23,7 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      // 1. Create the account (org + user + chatbot + sample data).
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,17 +35,24 @@ export default function SignupPage() {
         setLoading(false);
         return;
       }
-      // auto sign-in with server-side redirect (bulletproof on Vercel)
-      await signIn("credentials", {
-        email: form.email,
-        password: form.password,
-        redirect: true,
-        callbackUrl: "/dashboard",
+      // 2. Auto sign-in: POST credentials to /api/auth/login, which sets
+      // the session cookie in the response. Then redirect to /dashboard.
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, password: form.password }),
       });
-      // If this returns, sign-in failed — redirect to login manually
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 300);
+      if (!loginRes.ok) {
+        // Account was created but auto-login failed — send user to /login.
+        toast.error("Account created. Please sign in.");
+        router.push("/login");
+        setTimeout(() => { window.location.href = "/login"; }, 50);
+        return;
+      }
+      // 3. Success — redirect to /dashboard. Use window.location for a
+      // full navigation so the new cookie is sent with the request.
+      router.push("/dashboard");
+      setTimeout(() => { window.location.href = "/dashboard"; }, 50);
     } catch {
       toast.error("Something went wrong");
       setLoading(false);
