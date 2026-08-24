@@ -306,7 +306,7 @@ function ConfigurationTab({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
       {/* Form */}
-      <Card className="rounded-xl border shadow-sm">
+      <Card className="rounded-lg border bg-card shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="size-5 text-primary" />
@@ -514,7 +514,7 @@ function MiniWidgetPreview({
   status: string;
 }) {
   return (
-    <Card className="overflow-hidden rounded-xl border shadow-sm">
+    <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <Eye className="size-4 text-muted-foreground" />
@@ -525,7 +525,7 @@ function MiniWidgetPreview({
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="rounded-b-xl overflow-hidden shadow-inner">
+        <div className="rounded-b-xl overflow-hidden">
           {/* Mock widget header */}
           <div
             className="px-4 py-3 flex items-center gap-3"
@@ -565,7 +565,7 @@ function MiniWidgetPreview({
               >
                 <Bot className="size-3.5" />
               </div>
-              <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-background px-3 py-2 text-sm shadow-sm">
+              <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-background px-3 py-2 text-sm">
                 <p className="whitespace-pre-wrap break-words text-foreground">
                   {welcomeMessage || "Hi! How can I help you today?"}
                 </p>
@@ -686,9 +686,9 @@ function KnowledgeTab({
   function getDocIcon(sourceType: string) {
     switch (sourceType.toUpperCase()) {
       case "URL":
-        return <Globe className="size-4 shrink-0 text-sky-500" />;
+        return <Globe className="size-4 shrink-0 text-muted-foreground" />;
       case "FAQ":
-        return <HelpCircle className="size-4 shrink-0 text-amber-500" />;
+        return <HelpCircle className="size-4 shrink-0 text-muted-foreground" />;
       default:
         return <FileText className="size-4 shrink-0 text-primary" />;
     }
@@ -772,7 +772,7 @@ function KnowledgeTab({
           action={<AddKnowledgeDialog chatbotId={chatbot.id} onCreated={onChange} triggerLabel="Add your first document" />}
         />
       ) : sortedDocs.length === 0 ? (
-        <Card className="rounded-xl border border-dashed">
+        <Card className="rounded-lg border border-dashed bg-card shadow-none">
           <CardContent className="py-10 text-center">
             <Search className="mx-auto size-8 text-muted-foreground/50" />
             <p className="mt-2 text-sm text-muted-foreground">
@@ -848,8 +848,8 @@ function KnowledgeCard({
 
   return (
     <Card className={cn(
-      "group rounded-xl border shadow-sm transition-all hover:shadow-md",
-      selected && "ring-2 ring-primary/40 border-primary/40"
+      "group rounded-lg border bg-card shadow-none card-hover transition-colors",
+      selected && "border-foreground bg-muted/40"
     )}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
@@ -1117,7 +1117,7 @@ function FaqsTab({
           action={<AddFaqDialog onCreated={onChange} triggerLabel="Add your first FAQ" />}
         />
       ) : sortedFaqs.length === 0 ? (
-        <Card className="rounded-xl border border-dashed">
+        <Card className="rounded-lg border border-dashed bg-card shadow-none">
           <CardContent className="py-10 text-center">
             <Search className="mx-auto size-8 text-muted-foreground/50" />
             <p className="mt-2 text-sm text-muted-foreground">
@@ -1126,7 +1126,7 @@ function FaqsTab({
           </CardContent>
         </Card>
       ) : (
-        <Card className="rounded-xl border shadow-sm">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardContent className="p-2">
             <Accordion type="single" collapsible className="w-full">
               {sortedFaqs.map((faq, idx) => (
@@ -1494,7 +1494,7 @@ function EmbedTab({ chatbot }: { chatbot: Chatbot }) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_1fr]">
       <div className="space-y-6">
         {/* Embed snippet card */}
-        <Card className="rounded-xl border shadow-sm">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Code2 className="size-5 text-primary" />
@@ -1515,7 +1515,7 @@ function EmbedTab({ chatbot }: { chatbot: Chatbot }) {
                 className={cn(
                   "absolute right-2 top-2 size-8 rounded-md flex items-center justify-center transition-colors border",
                   copySuccess
-                    ? "bg-emerald-100 border-emerald-300 text-emerald-600 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-400"
+                    ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/40"
                     : "bg-background border-border hover:bg-accent text-muted-foreground"
                 )}
                 whileTap={{ scale: 0.9 }}
@@ -1581,7 +1581,7 @@ function EmbedTab({ chatbot }: { chatbot: Chatbot }) {
         </Card>
 
         {/* QR Code / Widget URL Card */}
-        <Card className="rounded-xl border shadow-sm">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <QrCode className="size-5 text-primary" />
@@ -1658,7 +1658,7 @@ function EmbedTab({ chatbot }: { chatbot: Chatbot }) {
 
       {/* Try it live card + widget preview */}
       <div className="space-y-4 lg:sticky lg:top-6">
-        <Card className="rounded-xl border shadow-sm">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <MessageSquare className="size-5 text-primary" />
@@ -1691,7 +1691,7 @@ function EmbedTab({ chatbot }: { chatbot: Chatbot }) {
             </div>
 
             {/* Mini widget preview */}
-            <div className="overflow-hidden rounded-lg border shadow-inner">
+            <div className="overflow-hidden rounded-lg border">
               <div
                 className="px-3 py-2 flex items-center gap-2"
                 style={{ backgroundColor: chatbot.primaryColor, color: "#fff" }}
@@ -1709,7 +1709,7 @@ function EmbedTab({ chatbot }: { chatbot: Chatbot }) {
                   >
                     <Bot className="size-2.5" />
                   </div>
-                  <div className="rounded-xl rounded-bl-sm bg-background px-2.5 py-1.5 text-xs shadow-sm max-w-[85%]">
+                  <div className="rounded-xl rounded-bl-sm bg-background px-2.5 py-1.5 text-xs max-w-[85%]">
                     {chatbot.welcomeMessage || "Hi! How can I help you today?"}
                   </div>
                 </div>
@@ -1750,7 +1750,7 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <Card className="rounded-xl border border-dashed shadow-sm">
+    <Card className="rounded-lg border border-dashed bg-card shadow-none">
       <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-center">
         <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
           {icon}

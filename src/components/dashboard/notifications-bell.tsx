@@ -23,10 +23,10 @@ type Notification = {
   read: boolean;
 };
 
-const ICONS: Record<string, { icon: typeof MessageSquare; color: string }> = {
-  new_message: { icon: MessageSquare, color: "text-violet-600 bg-violet-500/10" },
-  ai_reply: { icon: Bot, color: "text-emerald-600 bg-emerald-500/10" },
-  takeover: { icon: Headphones, color: "text-amber-600 bg-amber-500/10" },
+const ICONS: Record<string, { icon: typeof MessageSquare }> = {
+  new_message: { icon: MessageSquare },
+  ai_reply: { icon: Bot },
+  takeover: { icon: Headphones },
 };
 
 export function NotificationsBell() {
@@ -58,7 +58,7 @@ export function NotificationsBell() {
         <Button variant="ghost" size="icon" className="relative h-9 w-9">
           <Bell className="h-[18px] w-[18px]" />
           {data.unread > 0 && (
-            <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
               {data.unread > 9 ? "9+" : data.unread}
             </span>
           )}
@@ -90,8 +90,8 @@ export function NotificationsBell() {
                   onClick={() => setOpen(false)}
                   className="flex items-start gap-3 px-3 py-2.5 hover:bg-accent transition-colors border-b last:border-0"
                 >
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cfg.color}`}>
-                    <Icon className="h-4 w-4" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-muted/40">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm leading-tight">
@@ -105,7 +105,7 @@ export function NotificationsBell() {
                       {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
                     </div>
                   </div>
-                  {!n.read && <span className="h-2 w-2 rounded-full bg-violet-500 mt-1.5 shrink-0" />}
+                  {!n.read && <span className="h-2 w-2 rounded-full bg-foreground mt-1.5 shrink-0" />}
                 </Link>
               );
             })
@@ -115,7 +115,7 @@ export function NotificationsBell() {
         <Link
           href="/conversations"
           onClick={() => setOpen(false)}
-          className="block px-3 py-2.5 text-center text-xs font-medium text-violet-600 hover:bg-accent"
+          className="block px-3 py-2.5 text-center text-xs font-medium hover:bg-accent"
         >
           View all conversations
         </Link>

@@ -207,19 +207,19 @@ const TAG_COLORS: TagColor[] = [
 function tagBadgeClass(color: string): string {
   switch (color) {
     case "violet":
-      return "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 border-violet-200 dark:border-violet-500/30";
+      return "bg-foreground/10 text-foreground border-transparent";
     case "emerald":
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30";
+      return "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent";
     case "amber":
-      return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30";
+      return "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-transparent";
     case "fuchsia":
-      return "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-500/30";
+      return "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-transparent";
     case "rose":
-      return "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border-rose-200 dark:border-rose-500/30";
+      return "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-transparent";
     case "sky":
-      return "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 border-sky-200 dark:border-sky-500/30";
+      return "bg-sky-100 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-transparent";
     default:
-      return "bg-muted text-muted-foreground border-border";
+      return "bg-muted text-muted-foreground border-transparent";
   }
 }
 
@@ -273,12 +273,12 @@ function initials(name: string | null): string {
 function statusBadgeClass(status: ConvStatus): string {
   switch (status) {
     case "AI":
-      return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 border-violet-200 dark:border-violet-500/20";
+      return "bg-muted text-muted-foreground border-transparent";
     case "HUMAN":
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/20";
+      return "bg-foreground text-background border-transparent";
     case "CLOSED":
     default:
-      return "bg-muted text-muted-foreground border-border";
+      return "bg-transparent text-muted-foreground border";
   }
 }
 
@@ -1240,7 +1240,7 @@ export default function ConversationsPage() {
         <Collapsible
           open={tagsPanelOpen}
           onOpenChange={setTagsPanelOpen}
-          className="rounded-xl border bg-card overflow-hidden"
+          className="rounded-lg border bg-card shadow-none overflow-hidden"
         >
           <div className="flex items-center gap-2 px-4 py-2.5">
             <CollapsibleTrigger asChild>
@@ -1248,8 +1248,8 @@ export default function ConversationsPage() {
                 className="flex items-center gap-2 flex-1 min-w-0 text-left"
                 aria-label="Toggle tags panel"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-violet-500/15 to-fuchsia-500/15 border border-violet-200/60 dark:border-violet-700/30">
-                  <TagIcon className="size-3.5 text-violet-600 dark:text-violet-400" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-md border bg-muted">
+                  <TagIcon className="size-3.5 text-muted-foreground" />
                 </div>
                 <span className="text-sm font-medium">Tags</span>
                 <Badge variant="secondary" className="h-5 text-[10px]">
@@ -1272,8 +1272,8 @@ export default function ConversationsPage() {
             <div className="border-t px-4 py-3">
               {orgTags.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-6">
-                  <div className="size-10 rounded-xl bg-gradient-to-br from-violet-500/15 to-fuchsia-500/15 border border-violet-200/60 dark:border-violet-700/30 flex items-center justify-center mb-2">
-                    <TagIcon className="size-5 text-violet-500 dark:text-violet-400" />
+                  <div className="size-10 rounded-lg border bg-muted flex items-center justify-center mb-2">
+                    <TagIcon className="size-5 text-muted-foreground" />
                   </div>
                   <p className="text-sm font-medium">No tags yet</p>
                   <p className="text-xs text-muted-foreground mt-1 max-w-xs">
@@ -1321,7 +1321,7 @@ export default function ConversationsPage() {
                         </button>
                         <button
                           onClick={() => setTagDeleteId(t.id)}
-                          className="rounded p-0.5 hover:bg-rose-500/20 hover:text-rose-700 dark:hover:text-rose-300"
+                          className="rounded p-0.5 hover:bg-foreground/10 hover:text-foreground dark:hover:text-foreground"
                           aria-label={`Delete ${t.name}`}
                           title="Delete"
                         >
@@ -1341,7 +1341,7 @@ export default function ConversationsPage() {
           {/* ─── Left panel: list ─────────────────────────────── */}
           <aside
             className={cn(
-              "flex flex-col w-full md:w-80 lg:w-96 shrink-0 rounded-xl border bg-card overflow-hidden",
+              "flex flex-col w-full md:w-80 lg:w-96 shrink-0 rounded-lg border bg-card shadow-none overflow-hidden",
               mobileView === "detail" ? "hidden md:flex" : "flex"
             )}
           >
@@ -1494,7 +1494,7 @@ export default function ConversationsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className={cn("gap-1.5 h-7 text-xs", satisfactionFilter !== "all" && "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300")}
+                      className={cn("gap-1.5 h-7 text-xs", satisfactionFilter !== "all" && "border-foreground bg-muted text-foreground")}
                     >
                       <Star className="size-3" />
                       Satisfaction
@@ -1532,7 +1532,7 @@ export default function ConversationsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className={cn("gap-1.5 h-7 text-xs", datePreset !== "all" && "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300")}
+                      className={cn("gap-1.5 h-7 text-xs", datePreset !== "all" && "border-foreground bg-muted text-foreground")}
                     >
                       <Calendar className="size-3" />
                       {datePreset === "all" ? "Date" : datePreset === "7d" ? "7 days" : datePreset === "30d" ? "30 days" : "Custom"}
@@ -1668,7 +1668,7 @@ export default function ConversationsPage() {
                       return (
                         <>
                           {text.slice(0, idx)}
-                          <mark className="bg-amber-200/60 dark:bg-amber-500/30 rounded-sm px-0.5">
+                          <mark className="bg-foreground/15 rounded-sm px-0.5">
                             {text.slice(idx, idx + q.length)}
                           </mark>
                           {text.slice(idx + q.length)}
@@ -1682,10 +1682,10 @@ export default function ConversationsPage() {
                           className={cn(
                             "w-full flex items-start gap-3 px-3 py-3 text-left transition-all group relative",
                             isSelected
-                              ? "bg-accent/60 border-l-2 border-l-violet-500"
+                              ? "bg-accent/60 border-l-2 border-l-foreground"
                               : isChecked
                                 ? "bg-primary/5 border-l-2 border-l-primary/40"
-                                : "hover:bg-muted/50 border-l-2 border-l-transparent hover:border-l-violet-300"
+                                : "hover:bg-muted/50 border-l-2 border-l-transparent hover:border-l-foreground/40"
                           )}
                         >
                           {/* Checkbox */}
@@ -1727,7 +1727,7 @@ export default function ConversationsPage() {
                                   : "No messages yet"}
                               </p>
                               {isUnread && (
-                                <span className="size-2 rounded-full bg-violet-500 shrink-0 animate-glow-pulse" />
+                                <span className="size-2 rounded-full bg-foreground shrink-0" />
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-1.5">
@@ -1753,14 +1753,14 @@ export default function ConversationsPage() {
                               )}
                               {/* Satisfaction star */}
                               {conv.satisfaction !== null && conv.satisfaction > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500">
-                                  <Star className="size-2.5 fill-amber-500" />
+                                <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-400">
+                                  <Star className="size-2.5 fill-amber-400" />
                                   {conv.satisfaction}
                                 </span>
                               )}
                               {/* Glow dot for HUMAN conversations needing attention */}
                               {conv.status === "HUMAN" && !conv.assignedToId && (
-                                <span className="size-2 rounded-full bg-violet-500 shrink-0 animate-glow-pulse" title="Needs attention" />
+                                <span className="size-2 rounded-full bg-foreground shrink-0" title="Needs attention" />
                               )}
                             </div>
                           </div>
@@ -1776,7 +1776,7 @@ export default function ConversationsPage() {
           {/* ─── Right panel: chat view ──────────────────────── */}
           <section
             className={cn(
-              "flex-1 min-w-0 rounded-xl border bg-card overflow-hidden flex flex-col",
+              "flex-1 min-w-0 rounded-lg border bg-card shadow-none overflow-hidden flex flex-col",
               mobileView === "list" ? "hidden md:flex" : "flex"
             )}
           >
@@ -1954,7 +1954,7 @@ export default function ConversationsPage() {
                               className={cn(
                                 "gap-1.5",
                                 showSummary &&
-                                  "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                                  "border-foreground bg-muted text-foreground"
                               )}
                             >
                               {loadingSummary ? (
@@ -1990,7 +1990,7 @@ export default function ConversationsPage() {
                               className={cn(
                                 "gap-1.5 relative",
                                 showNotes &&
-                                  "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                  "border-foreground bg-muted text-foreground"
                               )}
                             >
                               <StickyNote className="size-3.5" />
@@ -1998,7 +1998,7 @@ export default function ConversationsPage() {
                               {notes.length > 0 && (
                                 <Badge
                                   variant="secondary"
-                                  className="ml-0.5 h-4 min-w-4 px-1 text-[10px] tabular-nums bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30"
+                                  className="ml-0.5 h-4 min-w-4 px-1 text-[10px] tabular-nums bg-muted text-muted-foreground border-transparent"
                                 >
                                   {notes.length}
                                 </Badge>
@@ -2080,7 +2080,7 @@ export default function ConversationsPage() {
                               className={cn(
                                 "size-8",
                                 showVisitorPanel &&
-                                  "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                                  "bg-muted text-foreground"
                               )}
                               onClick={() => setShowVisitorPanel((v) => !v)}
                             >
@@ -2119,15 +2119,15 @@ export default function ConversationsPage() {
                                 }
                                 className={cn(
                                   detail.assignedToId === m.id &&
-                                    "bg-violet-50 dark:bg-violet-950/30"
+                                    "bg-muted/60"
                                 )}
                               >
-                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-[9px] font-semibold mr-2">
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background text-[9px] font-semibold mr-2">
                                   {m.name.charAt(0).toUpperCase()}
                                 </div>
                                 <span className="truncate">{m.name}</span>
                                 {detail.assignedToId === m.id && (
-                                  <Check className="size-3 ml-auto text-violet-600" />
+                                  <Check className="size-3 ml-auto text-foreground" />
                                 )}
                               </DropdownMenuItem>
                             ))}
@@ -2151,18 +2151,18 @@ export default function ConversationsPage() {
 
                 {/* AI Summary panel */}
                 {showSummary && detail && (
-                  <div className="border-b bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 px-4 py-3">
+                  <div className="border-b bg-muted/40 px-4 py-3">
                     <div className="max-w-2xl mx-auto">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
                           <Sparkles className="size-3.5" />
                         </div>
-                        <span className="text-xs font-semibold text-violet-900 dark:text-violet-100">
+                        <span className="text-xs font-semibold text-foreground">
                           AI Summary
                         </span>
                         <button
                           onClick={() => setShowSummary(false)}
-                          className="ml-auto text-violet-400 hover:text-violet-600 dark:hover:text-violet-200"
+                          className="ml-auto text-muted-foreground hover:text-foreground"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -2174,7 +2174,7 @@ export default function ConversationsPage() {
                           <Skeleton className="h-3 w-2/3" />
                         </div>
                       ) : (
-                        <p className="text-xs text-violet-900/80 dark:text-violet-100/80 leading-relaxed">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                           {summary}
                         </p>
                       )}
@@ -2184,7 +2184,7 @@ export default function ConversationsPage() {
 
                 {/* Internal Notes panel (private, team-only) */}
                 {showNotes && detail && (
-                  <div className="border-b bg-amber-50/60 dark:bg-amber-950/20">
+                  <div className="border-b bg-amber-50/40 dark:bg-amber-500/5">
                     <Collapsible
                       open={!notesCollapsed}
                       onOpenChange={(open) => setNotesCollapsed(!open)}
@@ -2200,15 +2200,15 @@ export default function ConversationsPage() {
                                 : "Collapse notes"
                             }
                           >
-                            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-900/40 dark:border-amber-700/50">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-700/40">
                               <StickyNote className="size-3.5 text-amber-700 dark:text-amber-300" />
                             </div>
-                            <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                            <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
                               Internal Notes
                             </span>
                             <Badge
                               variant="secondary"
-                              className="h-5 text-[10px] tabular-nums bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30"
+                              className="h-5 text-[10px] tabular-nums bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-transparent"
                             >
                               {notes.length}
                             </Badge>
@@ -2232,7 +2232,7 @@ export default function ConversationsPage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="size-7 text-amber-700/80 hover:bg-amber-100 hover:text-amber-800 dark:text-amber-300/80 dark:hover:bg-amber-900/40"
+                              className="size-7 text-muted-foreground hover:bg-muted hover:text-foreground"
                               onClick={() => setShowNotes(false)}
                             >
                               <X className="size-3.5" />
@@ -2249,7 +2249,7 @@ export default function ConversationsPage() {
                               {[0, 1].map((i) => (
                                 <div
                                   key={i}
-                                  className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-3"
+                                  className="rounded-lg border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-500/5 p-3"
                                 >
                                   <div className="flex items-center gap-2 mb-2">
                                     <Skeleton className="size-6 rounded-full" />
@@ -2263,13 +2263,13 @@ export default function ConversationsPage() {
                             </div>
                           ) : notes.length === 0 ? (
                             <div className="flex flex-col items-center justify-center text-center py-6 px-4">
-                              <div className="size-10 rounded-xl bg-amber-100 border border-amber-200 dark:bg-amber-900/40 dark:border-amber-700/50 flex items-center justify-center mb-2">
-                                <StickyNote className="size-5 text-amber-600 dark:text-amber-300" />
+                              <div className="size-10 rounded-lg bg-amber-100 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-700/40 flex items-center justify-center mb-2">
+                                <StickyNote className="size-5 text-amber-700 dark:text-amber-300" />
                               </div>
-                              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                                 No notes yet
                               </p>
-                              <p className="text-xs text-amber-800/70 dark:text-amber-200/70 mt-1 max-w-xs">
+                              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
                                 Add a private note to share context,
                                 reminders, or handoff details with your team.
                               </p>
@@ -2300,23 +2300,22 @@ export default function ConversationsPage() {
                                           damping: 30,
                                         }}
                                         className={cn(
-                                          "group relative rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-3 shadow-sm transition-transform",
-                                          "border-amber-200 dark:border-amber-900/60",
-                                          "hover:rotate-[-0.4deg] hover:-translate-y-px",
+                                          "group relative rounded-lg border bg-amber-50/60 dark:bg-amber-500/5 p-3 shadow-none transition-colors",
+                                          "border-amber-200 dark:border-amber-800/40",
                                           isDeleting && "opacity-50"
                                         )}
                                       >
                                         <div className="flex items-center gap-2 mb-1.5">
                                           <div
                                             className={cn(
-                                              "flex size-6 items-center justify-center rounded-full text-white text-[10px] font-semibold ring-2 ring-amber-300 dark:ring-amber-600/60",
+                                              "flex size-6 items-center justify-center rounded-full text-white text-[10px] font-semibold",
                                               avatarColor(n.author.name)
                                             )}
                                             title={n.author.email}
                                           >
                                             {initials(n.author.name)}
                                           </div>
-                                          <span className="text-xs font-semibold text-amber-900 dark:text-amber-100 truncate">
+                                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 truncate">
                                             {n.author.name}
                                           </span>
                                           <span className="text-[10px] text-amber-700/70 dark:text-amber-300/70 truncate">
@@ -2325,7 +2324,7 @@ export default function ConversationsPage() {
                                           <div className="ml-auto flex items-center gap-0.5">
                                             {isConfirming ? (
                                               <>
-                                                <span className="text-[10px] text-amber-800 dark:text-amber-200 mr-1 hidden sm:inline">
+                                                <span className="text-[10px] text-muted-foreground mr-1 hidden sm:inline">
                                                   Delete?
                                                 </span>
                                                 <Tooltip>
@@ -2335,7 +2334,7 @@ export default function ConversationsPage() {
                                                         void deleteNote(n.id)
                                                       }
                                                       disabled={!!deletingNoteId}
-                                                      className="rounded p-1 text-rose-600 hover:bg-rose-500/20 dark:text-rose-300 disabled:opacity-50"
+                                                      className="rounded p-1 text-destructive hover:bg-foreground/10 disabled:opacity-50"
                                                       aria-label="Confirm delete note"
                                                     >
                                                       <Check className="size-3" />
@@ -2350,7 +2349,7 @@ export default function ConversationsPage() {
                                                     setConfirmDeleteNoteId(null)
                                                   }
                                                   disabled={!!deletingNoteId}
-                                                  className="rounded p-1 text-amber-800/70 hover:bg-amber-200/60 dark:text-amber-200/70 dark:hover:bg-amber-900/40 disabled:opacity-50"
+                                                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-50"
                                                   aria-label="Cancel delete"
                                                 >
                                                   <X className="size-3" />
@@ -2366,7 +2365,7 @@ export default function ConversationsPage() {
                                                       )
                                                     }
                                                     disabled={!!deletingNoteId}
-                                                    className="rounded p-1 text-amber-700/50 hover:bg-rose-500/15 hover:text-rose-600 dark:text-amber-300/50 dark:hover:text-rose-300 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:opacity-30"
+                                                    className="rounded p-1 text-muted-foreground/60 hover:bg-foreground/10 hover:text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:opacity-30"
                                                     aria-label="Delete note"
                                                   >
                                                     <Trash2 className="size-3" />
@@ -2379,7 +2378,7 @@ export default function ConversationsPage() {
                                             )}
                                           </div>
                                         </div>
-                                        <p className="text-xs text-amber-900/90 dark:text-amber-100/90 leading-relaxed whitespace-pre-wrap break-words pr-1">
+                                        <p className="text-xs text-amber-700/90 dark:text-amber-300/90 leading-relaxed whitespace-pre-wrap break-words pr-1">
                                           {n.content}
                                         </p>
                                       </motion.div>
@@ -2392,7 +2391,7 @@ export default function ConversationsPage() {
                           )}
 
                           {/* Composer */}
-                          <div className="space-y-1.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-2">
+                          <div className="space-y-1.5 rounded-lg border border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-500/5 p-2">
                             <Textarea
                               value={noteDraft}
                               onChange={(e) => setNoteDraft(e.target.value)}
@@ -2407,7 +2406,7 @@ export default function ConversationsPage() {
                               }}
                               placeholder="Add a private note for your team… (⌘+Enter to post)"
                               rows={2}
-                              className="resize-none min-h-[44px] max-h-40 bg-white/80 dark:bg-background/60 border-amber-200/70 dark:border-amber-900/50 focus-visible:ring-amber-400/40 text-amber-950 dark:text-amber-50 placeholder:text-amber-700/50 dark:placeholder:text-amber-300/40"
+                              className="resize-none min-h-[44px] max-h-40 bg-white/80 dark:bg-background/60 border-amber-200/70 dark:border-amber-800/40 focus-visible:ring-amber-400/40 text-foreground dark:text-foreground placeholder:text-muted-foreground"
                             />
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5 text-[10px] text-amber-700/80 dark:text-amber-300/70">
@@ -2420,8 +2419,8 @@ export default function ConversationsPage() {
                                     className={cn(
                                       "text-[10px] font-mono tabular-nums",
                                       noteDraft.length > 800
-                                        ? "text-rose-500"
-                                        : "text-amber-700/70 dark:text-amber-300/70"
+                                        ? "text-foreground"
+                                        : "text-muted-foreground"
                                     )}
                                   >
                                     {noteDraft.length}
@@ -2433,7 +2432,7 @@ export default function ConversationsPage() {
                                   disabled={
                                     !noteDraft.trim() || savingNote
                                   }
-                                  className="gap-1.5 h-7 text-xs bg-amber-500 text-white hover:bg-amber-600 border-amber-400 dark:bg-amber-600 dark:hover:bg-amber-500"
+                                  className="gap-1.5 h-7 text-xs bg-foreground text-background hover:bg-foreground/90 border-transparent"
                                 >
                                   {savingNote ? (
                                     <Clock className="size-3 animate-spin" />
@@ -2470,7 +2469,7 @@ export default function ConversationsPage() {
                           )}
                           <Skeleton
                             className={cn(
-                              "h-12 rounded-2xl",
+                              "h-12 rounded-lg",
                               i % 2 === 0 ? "w-64" : "w-48"
                             )}
                           />
@@ -2489,14 +2488,14 @@ export default function ConversationsPage() {
                   {detail && detail.status !== "CLOSED" && messages.length > 0 && (
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-1.5">
-                        <Wand2 className="size-3 text-violet-500" />
+                        <Wand2 className="size-3 text-muted-foreground" />
                         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                           AI suggested replies
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-5 px-1.5 text-[10px] text-violet-600 hover:text-violet-700"
+                          className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
                           onClick={() => void loadSuggestions()}
                           disabled={loadingSuggestions}
                         >
@@ -2523,9 +2522,9 @@ export default function ConversationsPage() {
                             <button
                               key={i}
                               onClick={() => setDraft(s)}
-                              className="group flex items-start gap-1.5 rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50/50 dark:bg-violet-950/20 px-2.5 py-1.5 text-left text-xs text-violet-900 dark:text-violet-100 hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors max-w-full"
+                              className="group flex items-start gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-left text-xs text-foreground hover:bg-muted transition-colors max-w-full"
                             >
-                              <Sparkles className="size-3 mt-0.5 shrink-0 text-violet-500 opacity-60 group-hover:opacity-100" />
+                              <Sparkles className="size-3 mt-0.5 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
                               <span className="line-clamp-2 flex-1">{s}</span>
                             </button>
                           ))}
@@ -2626,7 +2625,7 @@ export default function ConversationsPage() {
                       {draft.length > 0 && (
                         <span className={cn(
                           "text-[10px] font-mono",
-                          draft.length > 800 ? "text-amber-500" : "text-muted-foreground"
+                          draft.length > 800 ? "text-foreground" : "text-muted-foreground"
                         )}>
                           {draft.length}
                         </span>
@@ -2688,7 +2687,7 @@ export default function ConversationsPage() {
                       {/* Stats */}
                       <div className="grid grid-cols-2 gap-2">
                         <div className="rounded-lg border p-2.5 text-center">
-                          <div className="text-lg font-bold text-violet-600 dark:text-violet-400">
+                          <div className="text-lg font-semibold text-foreground tabular-nums">
                             {detail.visitor?.totalConversations ?? 1}
                           </div>
                           <div className="text-[10px] text-muted-foreground">
@@ -2696,7 +2695,7 @@ export default function ConversationsPage() {
                           </div>
                         </div>
                         <div className="rounded-lg border p-2.5 text-center">
-                          <div className="text-lg font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                          <div className="text-lg font-semibold text-foreground tabular-nums">
                             {detail.visitor?.totalMessages ?? messages.length}
                           </div>
                           <div className="text-[10px] text-muted-foreground">
@@ -2734,7 +2733,7 @@ export default function ConversationsPage() {
                         )}
                         {detail.satisfaction !== null && (
                           <div className="flex items-start gap-2">
-                            <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+                            <Star className="size-3.5 text-amber-400 mt-0.5 shrink-0" />
                             <div>
                               <div className="text-muted-foreground">Satisfaction</div>
                               <div className="font-medium">
@@ -2804,7 +2803,7 @@ export default function ConversationsPage() {
                         {/* Stats */}
                         <div className="grid grid-cols-2 gap-2">
                           <div className="rounded-lg border p-2.5 text-center">
-                            <div className="text-lg font-bold text-violet-600 dark:text-violet-400">
+                            <div className="text-lg font-semibold text-foreground tabular-nums">
                               {detail.visitor?.totalConversations ?? 1}
                             </div>
                             <div className="text-[10px] text-muted-foreground">
@@ -2812,7 +2811,7 @@ export default function ConversationsPage() {
                             </div>
                           </div>
                           <div className="rounded-lg border p-2.5 text-center">
-                            <div className="text-lg font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                            <div className="text-lg font-semibold text-foreground tabular-nums">
                               {detail.visitor?.totalMessages ?? messages.length}
                             </div>
                             <div className="text-[10px] text-muted-foreground">
@@ -2850,7 +2849,7 @@ export default function ConversationsPage() {
                           )}
                           {detail.satisfaction !== null && (
                             <div className="flex items-start gap-2">
-                              <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+                              <Star className="size-3.5 text-amber-400 mt-0.5 shrink-0" />
                               <div>
                                 <div className="text-muted-foreground">Satisfaction</div>
                                 <div className="font-medium">
@@ -2889,7 +2888,7 @@ export default function ConversationsPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border bg-card shadow-2xl px-4 py-2.5"
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border bg-card shadow-none px-4 py-2.5"
             >
               <Badge variant="secondary" className="gap-1.5 h-6">
                 <CheckSquare className="size-3" />
@@ -3005,7 +3004,7 @@ export default function ConversationsPage() {
                         clearSelection();
                       }}
                     >
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-[9px] font-semibold mr-2">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background text-[9px] font-semibold mr-2">
                         {m.name.charAt(0).toUpperCase()}
                       </div>
                       <span className="truncate">{m.name}</span>
@@ -3097,7 +3096,7 @@ export default function ConversationsPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <TagIcon className="size-4 text-violet-500" />
+                <TagIcon className="size-4 text-muted-foreground" />
                 {tagDialogMode === "edit" ? "Edit tag" : "Create tag"}
               </DialogTitle>
               <DialogDescription>
@@ -3279,8 +3278,8 @@ function MessageGroup({ group }: { group: { role: Message["role"]; items: Messag
     group.role === "VISITOR"
       ? "bg-muted-foreground"
       : group.role === "AI"
-        ? "bg-violet-500"
-        : "bg-fuchsia-500";
+        ? "bg-muted text-muted-foreground"
+        : "bg-foreground text-background";
 
   return (
     <div
@@ -3305,7 +3304,7 @@ function MessageGroup({ group }: { group: { role: Message["role"]; items: Messag
         )}
       >
         {isAI && (
-          <span className="text-[10px] font-medium text-violet-600 dark:text-violet-400 px-1 flex items-center gap-1">
+          <span className="text-[10px] font-medium text-muted-foreground px-1 flex items-center gap-1">
             <Bot className="size-3" /> AI Assistant
           </span>
         )}
@@ -3316,11 +3315,11 @@ function MessageGroup({ group }: { group: { role: Message["role"]; items: Messag
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.25 }}
             className={cn(
-              "rounded-2xl px-3.5 py-2 text-sm break-words",
+              "rounded-lg px-3.5 py-2 text-sm break-words",
               isAgent
                 ? "bg-primary text-primary-foreground rounded-br-sm"
                 : isAI
-                  ? "bg-violet-100 text-violet-900 dark:bg-violet-500/15 dark:text-violet-100 rounded-bl-sm"
+                  ? "bg-muted text-foreground rounded-bl-sm"
                   : "bg-muted text-foreground rounded-bl-sm",
               i === 0 && (isAgent ? "rounded-tr-md" : "rounded-tl-md")
             )}
@@ -3335,7 +3334,7 @@ function MessageGroup({ group }: { group: { role: Message["role"]; items: Messag
       </div>
       {isAgent && (
         <Avatar className="size-7 mb-1 shrink-0">
-          <AvatarFallback className="bg-fuchsia-500 text-white text-[10px] font-semibold">
+          <AvatarFallback className="bg-foreground text-background text-[10px] font-semibold">
             <Headphones className="size-3.5" />
           </AvatarFallback>
         </Avatar>
@@ -3348,15 +3347,15 @@ function TypingBubble() {
   return (
     <div className="flex gap-2 items-end justify-start">
       <Avatar className="size-7 mb-1 shrink-0">
-        <AvatarFallback className="bg-violet-500 text-white text-[10px] font-semibold">
+        <AvatarFallback className="bg-muted text-muted-foreground text-[10px] font-semibold">
           <Bot className="size-3.5" />
         </AvatarFallback>
       </Avatar>
-      <div className="rounded-2xl rounded-bl-sm bg-violet-100 dark:bg-violet-500/15 px-4 py-3">
+      <div className="rounded-lg rounded-bl-sm bg-muted dark:bg-muted px-4 py-3">
         <div className="flex items-center gap-1">
-          <span className="typing-dot size-1.5 rounded-full bg-violet-500" />
-          <span className="typing-dot size-1.5 rounded-full bg-violet-500" />
-          <span className="typing-dot size-1.5 rounded-full bg-violet-500" />
+          <span className="typing-dot size-1.5 rounded-full bg-muted-foreground" />
+          <span className="typing-dot size-1.5 rounded-full bg-muted-foreground" />
+          <span className="typing-dot size-1.5 rounded-full bg-muted-foreground" />
         </div>
       </div>
     </div>
@@ -3383,11 +3382,8 @@ function ListSkeleton() {
 function EmptyList({ onClearFilters, hasFilters }: { onClearFilters: () => void; hasFilters: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-16 px-6">
-      <div className="relative mb-5">
-        <div className="absolute inset-0 bg-violet-500/10 blur-2xl rounded-full" />
-        <div className="relative size-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center border border-violet-200/50 dark:border-violet-700/30">
-          <Inbox className="size-8 opacity-50" />
-        </div>
+      <div className="size-16 rounded-lg border bg-muted/40 flex items-center justify-center mb-5">
+        <Inbox className="size-8 opacity-50" />
       </div>
       <p className="text-sm font-medium">No conversations found</p>
       <p className="text-xs mt-1 max-w-[220px] leading-relaxed">
@@ -3413,11 +3409,8 @@ function EmptyList({ onClearFilters, hasFilters }: { onClearFilters: () => void;
 function EmptyDetail() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
-      <div className="relative mb-6">
-        <div className="absolute inset-0 bg-violet-500/20 blur-2xl rounded-full" />
-        <div className="relative size-20 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
-          <MessageSquare className="size-10 text-white" />
-        </div>
+      <div className="size-20 rounded-lg bg-foreground text-background flex items-center justify-center mb-6">
+        <MessageSquare className="size-10" />
       </div>
       <h3 className="text-lg font-semibold">Select a conversation</h3>
       <p className="text-sm text-muted-foreground mt-1 max-w-sm">
@@ -3426,15 +3419,15 @@ function EmptyDetail() {
       </p>
       <div className="flex items-center gap-2 mt-6 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <Circle className="size-2 fill-violet-500 text-violet-500" /> AI
+          <Circle className="size-2 fill-muted-foreground text-muted-foreground" /> AI
         </span>
         <Separator orientation="vertical" className="h-3" />
         <span className="inline-flex items-center gap-1.5">
-          <Circle className="size-2 fill-emerald-500 text-emerald-500" /> Human
+          <Circle className="size-2 fill-foreground text-foreground" /> Human
         </span>
         <Separator orientation="vertical" className="h-3" />
         <span className="inline-flex items-center gap-1.5">
-          <Circle className="size-2 fill-muted-foreground text-muted-foreground" /> Closed
+          <Circle className="size-2 fill-muted-foreground/50 text-muted-foreground/50" /> Closed
         </span>
       </div>
     </div>

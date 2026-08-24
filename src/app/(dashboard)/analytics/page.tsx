@@ -157,8 +157,8 @@ function TrendPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 text-xs font-medium",
-        good ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+        "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums",
+        good ? "text-foreground" : "text-destructive"
       )}
     >
       {isUp ? (
@@ -178,7 +178,6 @@ function KpiCard({
   value,
   sub,
   accent,
-  glow,
   loading,
   trend,
   className,
@@ -188,7 +187,8 @@ function KpiCard({
   value: string;
   sub?: string;
   accent: string;
-  glow: string; // CSS color for hover sheen
+  /** Kept for prop signature compatibility; the hover sheen was removed for the clean aesthetic. */
+  glow: string;
   loading: boolean;
   trend?: React.ReactNode;
   className?: string;
@@ -196,19 +196,11 @@ function KpiCard({
   return (
     <Card
       className={cn(
-        "print-card rounded-xl border shadow-sm transition-all duration-300 group overflow-hidden relative",
-        "hover:shadow-md hover:-translate-y-0.5",
+        "print-card rounded-lg border bg-card shadow-none card-hover transition-colors",
         className
       )}
     >
-      {/* Hover gradient sheen */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-        style={{
-          background: `radial-gradient(140% 100% at 0% 0%, ${glow} 0%, transparent 55%)`,
-        }}
-      />
-      <CardContent className="relative p-5">
+      <CardContent className="p-5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {label}
@@ -225,7 +217,7 @@ function KpiCard({
         {loading ? (
           <Skeleton className="h-8 w-24 mt-3" />
         ) : (
-          <div className="mt-2 text-3xl font-bold tracking-tight">{value}</div>
+          <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">{value}</div>
         )}
         <div className="mt-1 flex items-center justify-between">
           {sub && !loading ? (
@@ -266,7 +258,7 @@ function ChartCard({
       transition={{ duration: 0.5, delay, ease: "easeOut" }}
       className={cn(className)}
     >
-      <Card className="print-card rounded-xl border shadow-sm h-full">
+      <Card className="print-card rounded-lg border bg-card shadow-none h-full">
         <CardHeader className="flex flex-row items-start justify-between pb-2 space-y-0">
           <div className="flex items-start gap-3">
             <span
@@ -278,7 +270,7 @@ function ChartCard({
               <Icon className="h-4 w-4" />
             </span>
             <div>
-              <CardTitle className="text-base">{title}</CardTitle>
+              <CardTitle className="text-base font-medium">{title}</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">{description}</p>
             </div>
           </div>
@@ -392,18 +384,18 @@ export default function AnalyticsPage() {
   const statusData = useMemo(() => {
     const sb = data?.statusBreakdown ?? {};
     return [
-      { name: "AI handled", value: Number(sb.ai ?? 0), color: "#8b5cf6" },
-      { name: "Human", value: Number(sb.human ?? 0), color: "#d946ef" },
-      { name: "Closed", value: Number(sb.closed ?? 0), color: "#f59e0b" },
+      { name: "AI handled", value: Number(sb.ai ?? 0), color: "var(--chart-1)" },
+      { name: "Human", value: Number(sb.human ?? 0), color: "var(--chart-2)" },
+      { name: "Closed", value: Number(sb.closed ?? 0), color: "var(--chart-3)" },
     ].filter((d) => d.value > 0);
   }, [data]);
 
   const channelData = useMemo(() => {
     const cb = data?.channelBreakdown ?? {};
     return [
-      { name: "Widget", value: Number(cb.widget ?? 0), color: "#8b5cf6" },
-      { name: "API", value: Number(cb.api ?? 0), color: "#d946ef" },
-      { name: "Other", value: Number(cb.other ?? 0), color: "#f59e0b" },
+      { name: "Widget", value: Number(cb.widget ?? 0), color: "var(--chart-1)" },
+      { name: "API", value: Number(cb.api ?? 0), color: "var(--chart-2)" },
+      { name: "Other", value: Number(cb.other ?? 0), color: "var(--chart-3)" },
     ].filter((d) => d.value > 0);
   }, [data]);
 
@@ -525,11 +517,11 @@ export default function AnalyticsPage() {
         className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
             <BarChart3 className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
             <p className="text-sm text-muted-foreground">
               Track AI performance, satisfaction, and conversation volume.
             </p>
@@ -545,7 +537,7 @@ export default function AnalyticsPage() {
                 size="sm"
                 className="h-9 gap-2 rounded-lg bg-card"
               >
-                <CalendarIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs">{rangeLabel}</span>
               </Button>
             </PopoverTrigger>
@@ -603,7 +595,7 @@ export default function AnalyticsPage() {
           {/* Selected range badge */}
           <Badge
             variant="secondary"
-            className="hidden md:inline-flex bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 h-9 px-3"
+            className="hidden md:inline-flex bg-muted text-muted-foreground border-transparent h-9 px-3"
           >
             <CalendarIcon className="h-3 w-3" />
             {rangeLabel}
@@ -671,9 +663,9 @@ export default function AnalyticsPage() {
       </motion.div>
 
       {error && !loading && (
-        <Card className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardContent className="p-4 flex items-center gap-3 text-sm">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border bg-muted text-foreground">
               !
             </span>
             <div>
@@ -694,7 +686,7 @@ export default function AnalyticsPage() {
           label="Avg Response Time"
           value={fmtResponseTime(avgResponseTime)}
           sub="AI first reply"
-          accent="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          accent="border bg-muted text-muted-foreground tabular-nums"
           glow="rgba(245, 158, 11, 0.10)"
           loading={loading}
           trend={
@@ -713,7 +705,7 @@ export default function AnalyticsPage() {
           label="Peak Hour"
           value={fmtPeakHour(peakHourValue)}
           sub={`${peakCount} conversations`}
-          accent="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+          accent="border bg-muted text-muted-foreground tabular-nums"
           glow="rgba(139, 92, 246, 0.12)"
           loading={loading}
           trend={
@@ -730,7 +722,7 @@ export default function AnalyticsPage() {
           label="Resolution Rate"
           value={`${resolutionRate.toFixed(1)}%`}
           sub="AI resolved, no human"
-          accent="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+          accent="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-transparent"
           glow="rgba(16, 185, 129, 0.12)"
           loading={loading}
           trend={
@@ -748,7 +740,7 @@ export default function AnalyticsPage() {
           label="Total Messages Sent"
           value={totalMessages.toLocaleString()}
           sub={`${totalConversations.toLocaleString()} conversations`}
-          accent="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300"
+          accent="border bg-muted text-muted-foreground tabular-nums"
           glow="rgba(217, 70, 239, 0.12)"
           loading={loading}
           trend={
@@ -773,7 +765,7 @@ export default function AnalyticsPage() {
           label="Avg Satisfaction"
           value={avgSatisfaction.toFixed(1)}
           sub="out of 5.0 rating"
-          accent="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+          accent="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-transparent"
           glow="rgba(16, 185, 129, 0.12)"
           loading={loading}
           trend={
@@ -791,7 +783,7 @@ export default function AnalyticsPage() {
           label="Conversations"
           value={totalConversations.toLocaleString()}
           sub={`${aiHandled.toLocaleString()} AI-handled`}
-          accent="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+          accent="border bg-muted text-muted-foreground tabular-nums"
           glow="rgba(139, 92, 246, 0.12)"
           loading={loading}
           trend={
@@ -809,7 +801,7 @@ export default function AnalyticsPage() {
           label="AI Handled"
           value={aiHandled.toLocaleString()}
           sub={`${totalConversations > 0 ? ((aiHandled / totalConversations) * 100).toFixed(0) : 0}% of total`}
-          accent="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300"
+          accent="border bg-muted text-muted-foreground tabular-nums"
           glow="rgba(217, 70, 239, 0.12)"
           loading={loading}
         />
@@ -818,7 +810,7 @@ export default function AnalyticsPage() {
           label="Contacts"
           value={totalContacts.toLocaleString()}
           sub="Leads captured"
-          accent="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          accent="border bg-muted text-muted-foreground tabular-nums"
           glow="rgba(245, 158, 11, 0.10)"
           loading={loading}
         />
@@ -830,13 +822,13 @@ export default function AnalyticsPage() {
           title="Conversations over time"
           description={`Daily volume — ${rangeLabel}`}
           icon={BarChart3}
-          iconAccent="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+          iconAccent="border bg-muted text-muted-foreground tabular-nums"
           delay={0.1}
           className="lg:col-span-2"
           badge={
             <Badge
               variant="secondary"
-              className="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+              className="border bg-muted text-muted-foreground tabular-nums"
             >
               {filteredConvTrend.reduce((s, d) => s + d.count, 0)} total
             </Badge>
@@ -876,7 +868,7 @@ export default function AnalyticsPage() {
                     cursor={{ fill: "var(--accent)", opacity: 0.4 }}
                     contentStyle={tooltipStyle}
                   />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#8b5cf6" />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="var(--chart-1)" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -887,7 +879,7 @@ export default function AnalyticsPage() {
           title="Status distribution"
           description="AI vs human vs closed"
           icon={Target}
-          iconAccent="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300"
+          iconAccent="border bg-muted text-muted-foreground tabular-nums"
           delay={0.15}
         >
           <div className="h-[200px] w-full">
@@ -938,19 +930,19 @@ export default function AnalyticsPage() {
         </ChartCard>
       </div>
 
-      {/* ─── Chart row 2: Satisfaction trend (violet) + Channel donut */}
+      {/* ─── Chart row 2: Satisfaction trend + Channel donut */}
       <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard
           title="Satisfaction trend"
           description="Last 14 days — avg rating per day"
           icon={Star}
-          iconAccent="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+          iconAccent="border bg-muted text-muted-foreground tabular-nums"
           delay={0.2}
           className="lg:col-span-2"
           badge={
             <Badge
               variant="secondary"
-              className="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+              className="border bg-muted text-muted-foreground tabular-nums"
             >
               <Star className="h-3 w-3" />
               {avgSatisfaction.toFixed(1)} avg
@@ -968,8 +960,8 @@ export default function AnalyticsPage() {
                 >
                   <defs>
                     <linearGradient id="satGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.45} />
+                      <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -998,11 +990,11 @@ export default function AnalyticsPage() {
                   <Area
                     type="monotone"
                     dataKey="score"
-                    stroke="#8b5cf6"
+                    stroke="var(--chart-1)"
                     strokeWidth={2.5}
                     fill="url(#satGrad)"
-                    dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
-                    activeDot={{ r: 6, fill: "#8b5cf6" }}
+                    dot={{ r: 3, fill: "var(--chart-1)", strokeWidth: 0 }}
+                    activeDot={{ r: 6, fill: "var(--chart-1)" }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -1014,7 +1006,7 @@ export default function AnalyticsPage() {
           title="Channel breakdown"
           description="Where conversations start"
           icon={Globe}
-          iconAccent="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300"
+          iconAccent="border bg-muted text-muted-foreground tabular-nums"
           delay={0.25}
         >
           <div className="h-[200px] w-full">
@@ -1088,12 +1080,12 @@ export default function AnalyticsPage() {
           title="Conversation length distribution"
           description="Conversations by message count"
           icon={Clock}
-          iconAccent="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+          iconAccent="border bg-muted text-muted-foreground tabular-nums"
           delay={0.3}
           badge={
             <Badge
               variant="secondary"
-              className="bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+              className="border bg-muted text-muted-foreground tabular-nums"
             >
               {responseTimeDist.reduce((s, r) => s + r.count, 0)} convos
             </Badge>
@@ -1139,7 +1131,7 @@ export default function AnalyticsPage() {
                     {responseTimeDist.map((_, i) => (
                       <Cell
                         key={i}
-                        fill={i === 0 ? "#8b5cf6" : i === 1 ? "#a855f7" : i === 2 ? "#c026d3" : "#d946ef"}
+                        fill={i === 0 ? "var(--chart-1)" : i === 1 ? "var(--chart-3)" : i === 2 ? "var(--chart-4)" : "var(--chart-5)"}
                       />
                     ))}
                   </Bar>
@@ -1158,13 +1150,13 @@ export default function AnalyticsPage() {
           title="Hourly activity"
           description="Conversation volume by hour of day"
           icon={Activity}
-          iconAccent="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+          iconAccent="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-transparent"
           delay={0.35}
           badge={
             peakHourValue >= 0 ? (
               <Badge
                 variant="secondary"
-                className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-transparent tabular-nums"
               >
                 Peak: {fmtHour(peakHourValue)}
               </Badge>
@@ -1208,7 +1200,7 @@ export default function AnalyticsPage() {
                     {hourlyData.map((h) => (
                       <Cell
                         key={h.raw}
-                        fill={h.raw === peakHourValue ? "#059669" : "#10b981"}
+                        fill="var(--chart-2)"
                         fillOpacity={h.raw === peakHourValue ? 1 : 0.55}
                       />
                     ))}
@@ -1219,7 +1211,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" />
+              <span className="h-2.5 w-2.5 rounded-sm bg-[var(--chart-2)]" />
               Peak hour highlighted
             </span>
             <span>24-hour window</span>
@@ -1229,14 +1221,14 @@ export default function AnalyticsPage() {
 
       {/* ─── Top questions ─────────────────────────────────────────── */}
       <motion.div {...stagger(8)}>
-        <Card className="print-card rounded-xl border shadow-sm">
+        <Card className="print-card rounded-lg border bg-card shadow-none">
           <CardHeader className="flex flex-row items-start justify-between pb-2 space-y-0">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+              <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
                 <MessageSquare className="h-4 w-4" />
               </span>
               <div>
-                <CardTitle className="text-base">Top questions</CardTitle>
+                <CardTitle className="text-base font-medium">Top questions</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
                   Most asked by your visitors
                 </p>
@@ -1269,7 +1261,7 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                        className="h-full rounded-full bg-foreground/80 transition-all"
                         style={{ width: `${(q.count / maxQ) * 100}%` }}
                       />
                     </div>
@@ -1283,8 +1275,8 @@ export default function AnalyticsPage() {
 
       {/* Loading overlay for refetch */}
       {loading && (
-        <div className="no-print fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border bg-card/80 backdrop-blur px-3 py-1.5 text-xs shadow-md">
-          <Loader2 className="h-3 w-3 animate-spin text-violet-500" />
+        <div className="no-print fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-none">
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
           Refreshing…
         </div>
       )}

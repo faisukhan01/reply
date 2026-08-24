@@ -128,17 +128,17 @@ const planBadge: Record<string, { label: string; className: string }> = {
   },
   STARTER: {
     label: "Starter",
-    className: "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
+    className: "bg-muted text-muted-foreground border-transparent",
   },
   PRO: {
     label: "Pro",
     className:
-      "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+      "bg-foreground text-background border-transparent",
   },
   SCALE: {
     label: "Scale",
     className:
-      "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300",
+      "bg-muted text-muted-foreground border-transparent",
   },
 };
 
@@ -166,9 +166,9 @@ function initials(name: string) {
 
 // Role badge styles
 const roleStyles: Record<string, { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
-  OWNER: { bg: "bg-violet-100 dark:bg-violet-950/40", text: "text-violet-700 dark:text-violet-300", icon: Crown },
-  ADMIN: { bg: "bg-emerald-100 dark:bg-emerald-950/40", text: "text-emerald-700 dark:text-emerald-300", icon: Shield },
-  AGENT: { bg: "bg-amber-100 dark:bg-amber-950/40", text: "text-amber-700 dark:text-amber-300", icon: Headphones },
+  OWNER: { bg: "bg-foreground", text: "text-background", icon: Crown },
+  ADMIN: { bg: "bg-muted", text: "text-foreground", icon: Shield },
+  AGENT: { bg: "bg-transparent border", text: "text-muted-foreground", icon: Headphones },
 };
 
 const roleDescriptions: Record<string, string> = {
@@ -527,11 +527,11 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
           <Building2 className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="text-sm text-muted-foreground">
             Manage your organization, team, billing, and preferences.
           </p>
@@ -540,7 +540,7 @@ export default function SettingsPage() {
 
       {/* Profile completion */}
       {!loading && (
-        <Card className="rounded-xl border shadow-sm">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardContent className="p-4">
             {(() => {
               const checklist = [
@@ -558,7 +558,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Setup progress</span>
-                      <Badge variant="secondary" className="text-xs">{pct}%</Badge>
+                      <Badge variant="secondary" className="text-xs tabular-nums">{pct}%</Badge>
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {pct === 100 ? "All set! 🎉" : "Complete your setup to unlock full potential"}
@@ -569,7 +569,7 @@ export default function SettingsPage() {
                     {checklist.map((c) => (
                       <div key={c.label} className="flex items-center gap-1.5 text-xs">
                         {c.done ? (
-                          <Check className="h-3 w-3 text-emerald-500" />
+                          <Check className="h-3 w-3 text-foreground" />
                         ) : (
                           <span className="h-3 w-3 rounded-full border border-muted-foreground/30" />
                         )}
@@ -621,9 +621,9 @@ export default function SettingsPage() {
         {/* Organization */}
         <TabsContent value="organization" className="mt-4">
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="rounded-xl border shadow-sm lg:col-span-2">
+            <Card className="rounded-lg border bg-card shadow-none lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-base">Organization profile</CardTitle>
+                <CardTitle className="text-base font-medium">Organization profile</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {loading ? (
@@ -679,10 +679,10 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-xl border shadow-sm">
+            <Card className="rounded-lg border bg-card shadow-none">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Crown className="h-4 w-4 text-violet-500" />
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-muted-foreground" />
                   Current plan
                 </CardTitle>
               </CardHeader>
@@ -736,10 +736,10 @@ export default function SettingsPage() {
         {/* Members */}
         <TabsContent value="members" className="mt-4">
           <div className="space-y-4">
-            <Card className="rounded-xl border shadow-sm">
+            <Card className="rounded-lg border bg-card shadow-none">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Team members</CardTitle>
+                  <CardTitle className="text-base font-medium">Team members</CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
                     Invite teammates to collaborate on conversations.
                   </p>
@@ -826,13 +826,13 @@ export default function SettingsPage() {
                           <SelectContent>
                             <SelectItem value="AGENT">
                               <span className="flex items-center gap-2">
-                                <Headphones className="h-3.5 w-3.5 text-amber-600" />
+                                <Headphones className="h-3.5 w-3.5 text-muted-foreground" />
                                 Agent
                               </span>
                             </SelectItem>
                             <SelectItem value="ADMIN">
                               <span className="flex items-center gap-2">
-                                <Shield className="h-3.5 w-3.5 text-emerald-600" />
+                                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
                                 Admin
                               </span>
                             </SelectItem>
@@ -915,7 +915,7 @@ export default function SettingsPage() {
                               <TableCell className="pl-4">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-9 w-9">
-                                    <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+                                    <AvatarFallback className="bg-muted text-foreground text-xs font-medium">
                                       {initials(m.name) || "?"}
                                     </AvatarFallback>
                                   </Avatar>
@@ -1018,10 +1018,10 @@ export default function SettingsPage() {
             </AlertDialog>
 
             {/* Permissions info card */}
-            <Card className="rounded-xl border shadow-sm">
+            <Card className="rounded-lg border bg-card shadow-none">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-violet-500" />
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
                   Role Permissions
                 </CardTitle>
               </CardHeader>
@@ -1032,19 +1032,19 @@ export default function SettingsPage() {
                       <TableRow className="bg-muted/40">
                         <TableHead className="pl-4">Permission</TableHead>
                         <TableHead className="text-center">
-                          <Badge className="gap-1 border-0 bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300">
+                          <Badge className="gap-1 bg-foreground text-background border-transparent">
                             <Crown className="h-3 w-3" />
                             Owner
                           </Badge>
                         </TableHead>
                         <TableHead className="text-center">
-                          <Badge className="gap-1 border-0 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                          <Badge className="gap-1 bg-muted text-foreground border-transparent">
                             <Shield className="h-3 w-3" />
                             Admin
                           </Badge>
                         </TableHead>
                         <TableHead className="text-center">
-                          <Badge className="gap-1 border-0 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">
+                          <Badge className="gap-1 bg-transparent border text-muted-foreground">
                             <Headphones className="h-3 w-3" />
                             Agent
                           </Badge>
@@ -1057,21 +1057,21 @@ export default function SettingsPage() {
                           <TableCell className="pl-4 text-sm">{row.permission}</TableCell>
                           <TableCell className="text-center">
                             {row.OWNER ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                              <CheckCircle2 className="h-4 w-4 text-foreground mx-auto" />
                             ) : (
                               <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
                             )}
                           </TableCell>
                           <TableCell className="text-center">
                             {row.ADMIN ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                              <CheckCircle2 className="h-4 w-4 text-foreground mx-auto" />
                             ) : (
                               <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
                             )}
                           </TableCell>
                           <TableCell className="text-center">
                             {row.AGENT ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                              <CheckCircle2 className="h-4 w-4 text-foreground mx-auto" />
                             ) : (
                               <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
                             )}
@@ -1094,20 +1094,20 @@ export default function SettingsPage() {
         {/* Billing */}
         <TabsContent value="billing" className="mt-4">
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="rounded-xl border shadow-sm lg:col-span-2">
+            <Card className="rounded-lg border bg-card shadow-none lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-violet-500" />
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
                   Current plan
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/40 dark:to-fuchsia-950/40 border">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg border bg-muted/40">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                      <span className="font-semibold">Pro plan</span>
-                      <Badge className="bg-violet-600 text-white">Active</Badge>
+                      <Crown className="h-4 w-4 text-foreground" />
+                      <span className="font-medium">Pro plan</span>
+                      <Badge className="bg-foreground text-background border-transparent">Active</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       Up to 10,000 conversations/mo, full analytics, priority
@@ -1115,7 +1115,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold">$79</div>
+                    <div className="text-2xl font-semibold tabular-nums">$79</div>
                     <div className="text-xs text-muted-foreground">/ month</div>
                   </div>
                 </div>
@@ -1162,14 +1162,14 @@ export default function SettingsPage() {
             </Card>
 
             {/* Scale plan CTA */}
-            <Card className="rounded-xl border shadow-sm">
+            <Card className="rounded-lg border bg-card shadow-none">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
                   <Sparkles /> Scale
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="text-3xl font-bold">
+                <div className="text-3xl font-semibold tabular-nums">
                   $199
                   <span className="text-sm font-normal text-muted-foreground">
                     /mo
@@ -1187,7 +1187,7 @@ export default function SettingsPage() {
                       key={f}
                       className="flex items-start gap-2 text-muted-foreground"
                     >
-                      <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <Check className="h-4 w-4 text-foreground shrink-0 mt-0.5" />
                       <span>{f}</span>
                     </li>
                   ))}
@@ -1200,9 +1200,9 @@ export default function SettingsPage() {
           </div>
 
           {/* Invoices */}
-          <Card className="rounded-xl border shadow-sm mt-4">
+          <Card className="rounded-lg border bg-card shadow-none mt-4">
             <CardHeader>
-              <CardTitle className="text-base">Invoice history</CardTitle>
+              <CardTitle className="text-base font-medium">Invoice history</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border overflow-hidden">
@@ -1224,11 +1224,11 @@ export default function SettingsPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {inv.date}
                         </TableCell>
-                        <TableCell className="text-sm">{inv.amount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{inv.amount}</TableCell>
                         <TableCell className="text-right pr-4">
                           <Badge
                             variant="secondary"
-                            className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-transparent"
                           >
                             <Check className="h-3 w-3" />
                             Paid
@@ -1245,10 +1245,10 @@ export default function SettingsPage() {
 
         {/* Notifications */}
         <TabsContent value="notifications" className="mt-4">
-          <Card className="rounded-xl border shadow-sm max-w-2xl">
+          <Card className="rounded-lg border bg-card shadow-none max-w-2xl">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="h-4 w-4 text-violet-500" />
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Bell className="h-4 w-4 text-muted-foreground" />
                 Notification preferences
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
@@ -1308,10 +1308,10 @@ export default function SettingsPage() {
         <TabsContent value="webhooks" className="mt-4">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-4">
-              <Card className="rounded-xl border shadow-sm">
+              <Card className="rounded-lg border bg-card shadow-none">
                 <CardHeader className="flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-base">Webhooks</CardTitle>
+                    <CardTitle className="text-base font-medium">Webhooks</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
                       Get notified when events happen in your account.
                     </p>
@@ -1448,9 +1448,9 @@ export default function SettingsPage() {
                       ))}
                     </div>
                   ) : webhooks.length === 0 ? (
-                    <div className="text-center py-12 px-4">
-                      <div className="mx-auto h-12 w-12 rounded-full bg-violet-100 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-300">
-                        <Webhook className="h-6 w-6" />
+                    <div className="rounded-lg border border-dashed bg-muted/20 px-6 py-12 text-center">
+                      <div className="mx-auto flex size-12 items-center justify-center rounded-lg border bg-card">
+                        <Webhook className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <p className="mt-4 text-sm font-medium">No webhooks yet</p>
                       <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
@@ -1553,7 +1553,7 @@ export default function SettingsPage() {
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive"
                                     onClick={() => handleDeleteWebhook(wh)}
                                   >
                                     Delete
@@ -1570,9 +1570,9 @@ export default function SettingsPage() {
               </Card>
 
               {/* Test webhook */}
-              <Card className="rounded-xl border shadow-sm">
+              <Card className="rounded-lg border bg-card shadow-none">
                 <CardHeader>
-                  <CardTitle className="text-base">Test a webhook</CardTitle>
+                  <CardTitle className="text-base font-medium">Test a webhook</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
                     Use the{" "}
                     <span className="font-medium text-foreground">Test</span>{" "}
@@ -1607,9 +1607,9 @@ export default function SettingsPage() {
 
             {/* Sidebar tips */}
             <div className="space-y-4">
-              <Card className="rounded-xl border shadow-sm">
+              <Card className="rounded-lg border bg-card shadow-none">
                 <CardHeader>
-                  <CardTitle className="text-base">Webhook events</CardTitle>
+                  <CardTitle className="text-base font-medium">Webhook events</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   {[
@@ -1619,16 +1619,16 @@ export default function SettingsPage() {
                     { event: "satisfaction.rated", desc: "Fired when a visitor rates a conversation" },
                   ].map((e) => (
                     <div key={e.event} className="space-y-0.5">
-                      <code className="text-xs font-mono text-violet-600 dark:text-violet-400">{e.event}</code>
+                      <code className="text-xs font-mono text-foreground">{e.event}</code>
                       <p className="text-xs text-muted-foreground">{e.desc}</p>
                     </div>
                   ))}
                 </CardContent>
               </Card>
-              <Card className="rounded-xl border border-violet-200/40 dark:border-violet-500/20 shadow-sm bg-violet-50/50 dark:bg-violet-950/10">
+              <Card className="rounded-lg border bg-muted/40 shadow-none">
                 <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
-                    <Zap className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Zap className="h-4 w-4 text-muted-foreground" />
                     Pro tip
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1642,9 +1642,9 @@ export default function SettingsPage() {
 
         {/* Danger zone */}
         <TabsContent value="danger" className="mt-4">
-          <Card className="rounded-xl border border-destructive/30 shadow-sm max-w-2xl">
+          <Card className="rounded-lg border border-destructive/30 bg-card shadow-none max-w-2xl">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-4 w-4" />
                 Danger zone
               </CardTitle>
@@ -1653,7 +1653,7 @@ export default function SettingsPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-destructive/30 bg-destructive/5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
                 <div>
                   <div className="font-medium text-sm">Delete organization</div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1682,7 +1682,7 @@ export default function SettingsPage() {
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
-                        className="bg-destructive text-white hover:bg-destructive/90"
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive"
                         onClick={() =>
                           toast.info(
                             "Contact support to delete your account — we've logged your request."
@@ -1696,7 +1696,7 @@ export default function SettingsPage() {
                 </AlertDialog>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg border">
                 <div>
                   <div className="font-medium text-sm">Export all data</div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1738,7 +1738,7 @@ function UsageBar({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{display}</span>
+        <span className="font-medium tabular-nums">{display}</span>
       </div>
       <Progress value={pct} />
     </div>
@@ -1771,7 +1771,7 @@ function NotifRow({
 
 function Sparkles() {
   return (
-    <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-fuchsia-500 to-violet-500 text-white">
+    <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-foreground text-background">
       <Crown className="h-3.5 w-3.5" />
     </span>
   );

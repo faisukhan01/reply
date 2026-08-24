@@ -182,7 +182,7 @@ export default function WidgetDemoPage() {
           <div className="flex items-center gap-2">
             <Badge
               variant="secondary"
-              className="bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+              className="bg-muted text-muted-foreground border-transparent"
             >
               <Sparkles className="h-3 w-3 mr-1" />
               Widget
@@ -191,7 +191,7 @@ export default function WidgetDemoPage() {
               Embeddable chat widget
             </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
             Your AI widget, ready to embed
           </h1>
           <p className="text-muted-foreground max-w-2xl">
@@ -205,10 +205,10 @@ export default function WidgetDemoPage() {
         <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 items-start">
           {/* LEFT: Customization panel */}
           <div className="space-y-6 lg:col-span-1">
-            <Card className="overflow-hidden">
-              <CardHeader className="bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/30">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Palette className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+            <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
+              <CardHeader className="bg-muted/40">
+                <CardTitle className="flex items-center gap-2 text-base font-medium">
+                  <Palette className="h-4 w-4 text-muted-foreground" />
                   Customize
                 </CardTitle>
                 <CardDescription>
@@ -317,13 +317,13 @@ export default function WidgetDemoPage() {
                           className={cn(
                             "relative h-16 rounded-lg border-2 transition-all overflow-hidden",
                             active
-                              ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30"
-                              : "border-border bg-muted/40 hover:border-violet-300"
+                              ? "border-foreground bg-muted"
+                              : "border-border bg-muted/40 hover:border-foreground/40"
                           )}
                         >
                           <div
                             className={cn(
-                              "absolute h-4 w-4 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-sm",
+                              "absolute h-4 w-4 rounded-full bg-foreground",
                               p.value === "bottom-right"
                                 ? "bottom-1.5 right-1.5"
                                 : "bottom-1.5 left-1.5"
@@ -333,7 +333,7 @@ export default function WidgetDemoPage() {
                             {p.label}
                           </div>
                           {active && (
-                            <div className="absolute top-1 right-1 h-3.5 w-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center">
+                            <div className="absolute top-1 right-1 h-3.5 w-3.5 rounded-full bg-foreground text-background flex items-center justify-center">
                               <Check className="h-2 w-2" />
                             </div>
                           )}
@@ -346,10 +346,10 @@ export default function WidgetDemoPage() {
             </Card>
 
             {/* Code snippet card */}
-            <Card className="overflow-hidden border-violet-200/60 dark:border-violet-900/40">
+            <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Code2 className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                <CardTitle className="flex items-center gap-2 text-base font-medium">
+                  <Code2 className="h-4 w-4 text-muted-foreground" />
                   Embed code
                 </CardTitle>
                 <CardDescription>
@@ -377,8 +377,8 @@ export default function WidgetDemoPage() {
                         className={cn(
                           "gap-1.5 transition-all",
                           copySuccess
-                            ? "bg-emerald-600 hover:bg-emerald-700"
-                            : "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90"
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            : "bg-foreground text-background hover:bg-foreground/90"
                         )}
                       >
                         <AnimatePresence mode="wait">
@@ -417,11 +417,11 @@ export default function WidgetDemoPage() {
 
           {/* RIGHT: live preview iframe - spans 2 cols */}
           <div className="space-y-4 lg:col-span-2 lg:sticky lg:top-6">
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Smartphone className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                  <CardTitle className="flex items-center gap-2 text-base font-medium">
+                    <Smartphone className="h-4 w-4 text-muted-foreground" />
                     Live preview
                   </CardTitle>
                   <div className="flex items-center gap-2">
@@ -452,18 +452,18 @@ export default function WidgetDemoPage() {
                   This is the actual widget your visitors will see. Try chatting!
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex justify-center bg-gradient-to-br from-violet-50/60 to-fuchsia-50/60 dark:from-violet-950/20 dark:to-fuchsia-950/20 py-6">
+              <CardContent className="flex justify-center bg-muted/40 py-6">
                 {loading ? (
                   <div className="h-[560px] w-[380px] max-w-full rounded-[2rem] border-8 border-gray-800 bg-muted animate-pulse" />
                 ) : bot ? (
                   <div className="relative">
                     {/* Phone mockup */}
-                    <div className="relative w-[380px] max-w-[88vw] h-[560px] max-h-[70vh] rounded-[2rem] border-8 border-gray-800 dark:border-gray-900 shadow-2xl overflow-hidden bg-white">
+                    <div className="relative w-[380px] max-w-[88vw] h-[560px] max-h-[70vh] rounded-[2rem] border-8 border-gray-800 dark:border-gray-900 overflow-hidden bg-white">
                       {/* notch */}
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 h-5 w-28 bg-gray-800 dark:bg-gray-900 rounded-b-2xl" />
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 h-5 w-28 bg-gray-800 dark:bg-gray-900 rounded-b-lg" />
                       {/* Customization preview overlay */}
                       <div className="absolute bottom-0 left-0 right-0 z-10 p-3">
-                        <div className="rounded-xl overflow-hidden shadow-lg" style={{ backgroundColor: selectedColor }}>
+                        <div className="rounded-lg overflow-hidden" style={{ backgroundColor: selectedColor }}>
                           <div className="px-3 py-2 flex items-center gap-2 text-white">
                             <div className="size-6 rounded-full bg-white/20 flex items-center justify-center">
                               <Bot className="size-3" />
@@ -526,10 +526,10 @@ export default function WidgetDemoPage() {
 
         {/* How it works */}
         <Separator />
-        <Card>
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Rocket className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
+            <CardTitle className="flex items-center gap-2 text-base font-medium">
+              <Rocket className="h-4 w-4 text-muted-foreground" />
               How it works
             </CardTitle>
             <CardDescription>
@@ -542,10 +542,10 @@ export default function WidgetDemoPage() {
               return (
                 <div key={i} className="flex items-start gap-4">
                   <div className="relative shrink-0">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center shadow-md shadow-violet-500/20">
+                    <div className="h-10 w-10 rounded-lg border bg-muted text-muted-foreground flex items-center justify-center">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-background border-2 border-violet-300 dark:border-violet-700 text-[10px] font-bold flex items-center justify-center text-violet-700 dark:text-violet-300">
+                    <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-foreground text-background text-[10px] font-medium tabular-nums flex items-center justify-center">
                       {i + 1}
                     </span>
                   </div>
@@ -568,30 +568,22 @@ export default function WidgetDemoPage() {
               icon: Bot,
               title: "AI-powered",
               desc: "Trained on your knowledge base & FAQs.",
-              color: "from-violet-500 to-purple-600",
             },
             {
               icon: MessageSquare,
               title: "Real-time",
               desc: "Sub-2-second responses, 24/7.",
-              color: "from-fuchsia-500 to-pink-600",
             },
             {
               icon: Rocket,
               title: "1-line install",
               desc: "No SDK. No build step. Just paste & go.",
-              color: "from-rose-500 to-orange-500",
             },
           ].map((f) => {
             const Icon = f.icon;
             return (
-              <Card key={f.title} className="p-4 flex items-start gap-3">
-                <div
-                  className={cn(
-                    "h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br text-white flex items-center justify-center shadow-md",
-                    f.color
-                  )}
-                >
+              <Card key={f.title} className="p-4 flex items-start gap-3 rounded-lg border bg-card shadow-none">
+                <div className="h-10 w-10 shrink-0 rounded-lg border bg-muted text-muted-foreground flex items-center justify-center">
                   <Icon className="h-5 w-5" />
                 </div>
                 <div>

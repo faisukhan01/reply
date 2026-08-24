@@ -53,10 +53,10 @@ export function ShortcutsDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
-              <Keyboard className="size-4 text-violet-600 dark:text-violet-300" />
+            <div className="flex size-8 items-center justify-center rounded-md border bg-muted/40">
+              <Keyboard className="size-4 text-muted-foreground" />
             </div>
-            <DialogTitle className="text-lg">Keyboard Shortcuts</DialogTitle>
+            <DialogTitle className="text-base font-medium tracking-tight">Keyboard Shortcuts</DialogTitle>
           </div>
           <DialogDescription>
             Use these shortcuts to navigate faster

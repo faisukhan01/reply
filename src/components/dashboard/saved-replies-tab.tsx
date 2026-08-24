@@ -160,11 +160,11 @@ export function SavedRepliesTab() {
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="rounded-xl border shadow-sm lg:col-span-2">
+        <Card className="rounded-lg border bg-card shadow-none lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Zap className="h-4 w-4 text-violet-500" />
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Zap className="h-4 w-4 text-muted-foreground" />
                 Saved Replies
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
@@ -185,8 +185,8 @@ export function SavedRepliesTab() {
               </div>
             ) : responses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/10 mb-3">
-                  <MessageSquareText className="h-6 w-6 text-violet-500" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/40 mb-3">
+                  <MessageSquareText className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium">No saved replies yet</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm">
@@ -202,10 +202,10 @@ export function SavedRepliesTab() {
                 {responses.map((r) => (
                   <div
                     key={r.id}
-                    className="group flex items-start gap-3 rounded-lg border p-3 hover:border-violet-300 dark:hover:border-violet-700 transition-colors hover-lift"
+                    className="card-hover group flex items-start gap-3 rounded-lg border bg-card p-3 transition-colors"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                      <MessageSquareText className="h-4 w-4" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+                      <MessageSquareText className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -236,7 +236,7 @@ export function SavedRepliesTab() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                        className="h-8 w-8 hover:text-destructive"
                         onClick={() => setDeleteId(r.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -250,16 +250,16 @@ export function SavedRepliesTab() {
         </Card>
 
         {/* Tips card */}
-        <Card className="rounded-xl border shadow-sm">
+        <Card className="rounded-lg border bg-card shadow-none">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Keyboard className="h-4 w-4 text-fuchsia-500" />
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <Keyboard className="h-4 w-4 text-muted-foreground" />
               Tips
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex gap-2.5">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-600 text-xs font-semibold">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-xs font-medium tabular-nums text-muted-foreground">
                 1
               </span>
               <p className="text-muted-foreground leading-relaxed">
@@ -267,7 +267,7 @@ export function SavedRepliesTab() {
               </p>
             </div>
             <div className="flex gap-2.5">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-600 text-xs font-semibold">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-xs font-medium tabular-nums text-muted-foreground">
                 2
               </span>
               <p className="text-muted-foreground leading-relaxed">
@@ -275,15 +275,15 @@ export function SavedRepliesTab() {
               </p>
             </div>
             <div className="flex gap-2.5">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-600 text-xs font-semibold">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-xs font-medium tabular-nums text-muted-foreground">
                 3
               </span>
               <p className="text-muted-foreground leading-relaxed">
                 Click the <Zap className="inline h-3 w-3" /> icon in the inbox composer to access saved replies.
               </p>
             </div>
-            <div className="rounded-lg bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/20 p-3 mt-2">
-              <p className="text-xs text-violet-900 dark:text-violet-100 leading-relaxed">
+            <div className="rounded-md border bg-muted/20 p-3 mt-2">
+              <p className="text-xs text-foreground leading-relaxed">
                 <strong>Pro tip:</strong> Pair saved replies with AI suggestions for maximum speed.
               </p>
             </div>
@@ -368,7 +368,7 @@ export function SavedRepliesTab() {
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleting}
-              className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-600"
+              className="bg-destructive hover:bg-destructive focus:ring-destructive text-destructive-foreground"
             >
               {deleting ? (
                 <>

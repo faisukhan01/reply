@@ -37,7 +37,7 @@ export default async function DashboardLayout({
       />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar userName={user.name} orgName={user.orgName} />
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-10">{children}</main>
       </div>
       <OnboardingModal />
       <ShortcutsDialog />

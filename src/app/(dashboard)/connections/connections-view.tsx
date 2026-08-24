@@ -93,8 +93,8 @@ export function ConnectionsView({
   return (
     <div className="space-y-6">
       {dbDown && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="rounded-md border border-amber-200/60 bg-amber-50/60 dark:border-amber-500/20 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div>
             Database is unreachable. You can still browse the platform setup
             instructions, but existing connections won&apos;t load. Generate a
@@ -119,14 +119,14 @@ export function ConnectionsView({
             );
             return (
               <div key={p.id} className="px-5 py-4 flex items-start gap-4">
-                <div className="h-9 w-9 rounded-md border flex items-center justify-center shrink-0">
-                  <Plug className="h-4 w-4" />
+                <div className="h-9 w-9 rounded-md border bg-muted/40 flex items-center justify-center shrink-0">
+                  <Plug className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-medium">{p.name}</h3>
                     {alreadyConnected && (
-                      <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700">
+                      <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent">
                         Connected
                       </span>
                     )}
@@ -138,7 +138,7 @@ export function ConnectionsView({
                         : "Click Connect to enter your API credentials."}
                     </p>
                   ) : (
-                    <p className="mt-0.5 text-xs text-rose-600">
+                    <p className="mt-0.5 text-xs text-destructive">
                       Missing env vars: {p.missingEnvVars.join(", ")}. Set
                       them in Vercel → Settings → Environment Variables,
                       then redeploy.
@@ -194,18 +194,18 @@ export function ConnectionsView({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{c.accountName}</span>
-                    <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/5 text-muted-foreground">
+                    <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border-transparent">
                       {c.platform}
                     </span>
-                    <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      c.status === "ACTIVE" ? "bg-emerald-500/10 text-emerald-700" :
-                      c.status === "REVOKED" ? "bg-rose-500/10 text-rose-700" :
-                      "bg-amber-500/10 text-amber-700"
+                    <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border-transparent ${
+                      c.status === "ACTIVE" ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+                      c.status === "REVOKED" ? "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300" :
+                      "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300"
                     }`}>
                       {c.status}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">
+                  <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                     {c.accountHandle && <span>{c.accountHandle} · </span>}
                     Connected {new Date(c.createdAt).toLocaleDateString()}
                     {c.tokenExpiresAt && (

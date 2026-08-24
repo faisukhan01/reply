@@ -6,25 +6,19 @@ type Point = { label?: string; value: number };
 
 /**
  * Tiny inline SVG sparkline — used inside stat cards (7-day trend)
- * and the welcome banner (24h hourly activity). No external chart lib.
- *
- * Notes:
- * - Pure SVG, no recharts → fast and lightweight.
- * - Takes plain numeric points (already bucketed by the server).
- * - `tone` accepts a hex color so the same component works in
- *   multiple color themes (violet, emerald, amber, fuchsia).
+ * and the welcome banner (24h hourly activity). Pure SVG, no recharts.
  */
 export function MiniSparkline({
   points,
   width = 120,
   height = 36,
-  stroke = "#8b5cf6",
-  fill = true,
-  strokeWidth = 1.75,
+  stroke = "var(--foreground)",
+  fill = false,
+  strokeWidth = 1.5,
   className,
   ariaLabel,
 }: {
-  points: number[] | Point[];
+  points: number[] | { label?: string; value: number }[];
   width?: number;
   height?: number;
   stroke?: string;

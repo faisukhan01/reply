@@ -42,11 +42,11 @@ function formatDateTimeLocal(d: Date): string {
 }
 
 const statusBadge: Record<string, string> = {
-  PENDING: "bg-foreground/5 text-foreground",
-  QUEUED: "bg-foreground/5 text-foreground",
-  SENT: "bg-emerald-500/10 text-emerald-700",
-  FAILED: "bg-rose-500/10 text-rose-700",
-  CANCELLED: "bg-foreground/5 text-muted-foreground line-through",
+  PENDING: "bg-muted text-muted-foreground border-transparent",
+  QUEUED: "bg-muted text-muted-foreground border-transparent",
+  SENT: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent",
+  FAILED: "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-transparent",
+  CANCELLED: "bg-muted text-muted-foreground border-transparent line-through",
 };
 
 export function SchedulerView({
@@ -245,11 +245,11 @@ export function SchedulerView({
                     )}
                   </div>
                   <p className="mt-1 text-sm line-clamp-2">{m.content}</p>
-                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
                     <span>Scheduled for {new Date(m.scheduledFor).toLocaleString()}</span>
                     {m.sentAt && <span>· Sent {new Date(m.sentAt).toLocaleString()}</span>}
                     {m.attempts > 0 && <span>· Attempts: {m.attempts}</span>}
-                    {m.lastError && <span className="text-rose-600">· {m.lastError}</span>}
+                    {m.lastError && <span className="text-destructive">· {m.lastError}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

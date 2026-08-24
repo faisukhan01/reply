@@ -133,13 +133,12 @@ const sourceIcon: Record<string, typeof Globe> = {
 };
 
 const sourceColor: Record<string, string> = {
-  WIDGET:
-    "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-  API: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  WIDGET: "bg-foreground/10 text-foreground border-transparent",
+  API: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent",
   MANUAL:
-    "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300",
+    "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-transparent",
   IMPORT:
-    "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-transparent",
 };
 
 function initials(name: string) {
@@ -491,11 +490,11 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
             <Users className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Contacts</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Contacts</h1>
             <p className="text-sm text-muted-foreground">
               Manage leads and customer contact info.
             </p>
@@ -678,7 +677,7 @@ export default function ContactsPage() {
             className={cn(
               "inline-flex size-8 items-center justify-center rounded-[5px] text-muted-foreground transition-colors",
               view === "list"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-background text-foreground"
                 : "hover:text-foreground"
             )}
           >
@@ -691,7 +690,7 @@ export default function ContactsPage() {
             className={cn(
               "inline-flex size-8 items-center justify-center rounded-[5px] text-muted-foreground transition-colors",
               view === "grid"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-background text-foreground"
                 : "hover:text-foreground"
             )}
           >
@@ -705,7 +704,7 @@ export default function ContactsPage() {
         view === "grid" ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (
-              <Card key={i} className="rounded-xl p-4">
+              <Card key={i} className="rounded-lg border bg-card shadow-none p-4">
                 <div className="flex items-center gap-3">
                   <Skeleton className="size-12 rounded-full" />
                   <div className="flex-1 space-y-2">
@@ -721,7 +720,7 @@ export default function ContactsPage() {
             ))}
           </div>
         ) : (
-          <Card className="rounded-xl border shadow-sm p-0 overflow-hidden">
+          <Card className="rounded-lg border bg-card shadow-none p-0 overflow-hidden">
             <div className="p-4 space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -759,7 +758,7 @@ export default function ContactsPage() {
           </AnimatePresence>
         </motion.div>
       ) : (
-        <Card className="rounded-xl border shadow-sm p-0 overflow-hidden">
+        <Card className="rounded-lg border bg-card shadow-none p-0 overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
@@ -775,13 +774,13 @@ export default function ContactsPage() {
               {filteredContacts.map((c) => (
                 <TableRow
                   key={c.id}
-                  className="cursor-pointer transition-colors hover:bg-violet-50/50 dark:hover:bg-violet-500/5"
+                  className="cursor-pointer transition-colors hover:bg-muted/40"
                   onClick={() => setDetailId(c.id)}
                 >
                   <TableCell className="pl-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9">
-                        <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+                        <AvatarFallback className="bg-muted text-foreground text-xs font-medium">
                           {initials(c.name) || "?"}
                         </AvatarFallback>
                       </Avatar>
@@ -834,7 +833,7 @@ export default function ContactsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-violet-600 hover:bg-violet-500/10"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDetailId(c.id);
@@ -884,8 +883,8 @@ export default function ContactsPage() {
               </div>
             ) : (
               <div className="flex items-start gap-4 pt-2">
-                <Avatar className="size-16 ring-4 ring-violet-200/60 dark:ring-violet-500/30">
-                  <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-lg font-bold">
+                <Avatar className="size-16">
+                  <AvatarFallback className="bg-foreground text-background text-lg font-medium">
                     {initials(detail.contact.name) || "?"}
                   </AvatarFallback>
                 </Avatar>
@@ -908,7 +907,7 @@ export default function ContactsPage() {
           {detail && !detailLoading && (
             <div className="space-y-5 px-4 pb-8">
               {/* Contact fields */}
-              <div className="grid gap-3 rounded-xl border bg-muted/30 p-3">
+              <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
                 <DetailField
                   icon={Mail}
                   label="Email"
@@ -916,7 +915,7 @@ export default function ContactsPage() {
                     detail.contact.email ? (
                       <a
                         href={`mailto:${detail.contact.email}`}
-                        className="text-violet-600 dark:text-violet-300 hover:underline"
+                        className="text-foreground hover:underline"
                       >
                         {detail.contact.email}
                       </a>
@@ -952,7 +951,7 @@ export default function ContactsPage() {
                   </h3>
                 </div>
                 {detail.conversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-6 text-center">
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-6 text-center">
                     <Inbox className="size-6 text-muted-foreground/60" />
                     <p className="mt-2 text-xs text-muted-foreground">
                       No conversations linked to this contact.
@@ -964,9 +963,9 @@ export default function ContactsPage() {
                       <li key={c.id}>
                         <Link
                           href={`/conversations?id=${c.id}`}
-                          className="group flex items-start gap-3 rounded-lg border bg-card p-3 transition-colors hover:border-violet-300 hover:bg-violet-50/50 dark:hover:bg-violet-500/5"
+                          className="group flex items-start gap-3 rounded-lg border bg-card p-3 transition-colors hover:border-foreground/40 hover:bg-muted/40"
                         >
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
                             <MessageSquare className="size-4" />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -1165,11 +1164,9 @@ function SourceBadge({ source }: { source: string }) {
 /** Mini status badge for conversations inside drawer */
 function StatusMiniBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    AI: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-    HUMAN:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    CLOSED:
-      "bg-zinc-100 text-zinc-600 dark:bg-zinc-500/15 dark:text-zinc-300",
+    AI: "bg-muted text-muted-foreground border-transparent",
+    HUMAN: "bg-foreground text-background border-transparent",
+    CLOSED: "bg-transparent text-muted-foreground border",
   };
   return (
     <span
@@ -1217,7 +1214,7 @@ function DetailField({
   );
 }
 
-/** Empty state for contacts page with gradient background */
+/** Empty state for contacts page */
 function EmptyContactsState({
   isFiltered,
   onAdd,
@@ -1226,34 +1223,24 @@ function EmptyContactsState({
   onAdd: () => void;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-dashed border-violet-200/60 dark:border-violet-500/20 bg-gradient-to-br from-violet-50/80 via-fuchsia-50/50 to-transparent dark:from-violet-500/10 dark:via-fuchsia-500/5 dark:to-transparent px-6 py-16">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full bg-violet-200/40 blur-3xl dark:bg-violet-500/10"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-16 -left-12 size-48 rounded-full bg-fuchsia-200/40 blur-3xl dark:bg-fuchsia-500/10"
-      />
-      <div className="relative flex flex-col items-center justify-center text-center">
-        <div className="flex size-16 items-center justify-center rounded-2xl bg-white shadow-md ring-1 ring-violet-200/60 dark:bg-violet-500/10 dark:ring-violet-500/20">
-          <Users className="h-8 w-8 text-violet-600 dark:text-violet-300" />
-        </div>
-        <h3 className="mt-4 text-lg font-semibold">
-          {isFiltered ? "No matches found" : "No contacts yet"}
-        </h3>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          {isFiltered
-            ? "Try a different search term or filter, or clear the filters to see everyone."
-            : "Add your first contact to start building your CRM. You can also let visitors leave their info through the chatbot widget."}
-        </p>
-        {!isFiltered && (
-          <Button className="mt-4" size="sm" onClick={onAdd}>
-            <UserPlus className="h-4 w-4" />
-            Add your first contact
-          </Button>
-        )}
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 px-6 py-16 text-center">
+      <div className="flex size-16 items-center justify-center rounded-lg border bg-card">
+        <Users className="h-8 w-8 text-muted-foreground" />
       </div>
+      <h3 className="mt-4 text-lg font-semibold">
+        {isFiltered ? "No matches found" : "No contacts yet"}
+      </h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        {isFiltered
+          ? "Try a different search term or filter, or clear the filters to see everyone."
+          : "Add your first contact to start building your CRM. You can also let visitors leave their info through the chatbot widget."}
+      </p>
+      {!isFiltered && (
+        <Button className="mt-4" size="sm" onClick={onAdd}>
+          <UserPlus className="h-4 w-4" />
+          Add your first contact
+        </Button>
+      )}
     </div>
   );
 }
@@ -1279,7 +1266,7 @@ function ContactGridCard({
       transition={{ duration: 0.2 }}
     >
       <Card
-        className="group relative overflow-hidden rounded-xl border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-violet-500/10 hover:ring-1 hover:ring-violet-300/60 dark:hover:ring-violet-500/40"
+        className="group relative overflow-hidden rounded-lg border bg-card shadow-none card-hover transition-colors"
         role="button"
         tabIndex={0}
         onClick={onView}
@@ -1290,19 +1277,13 @@ function ContactGridCard({
           }
         }}
       >
-        {/* Gradient ring backdrop for avatar */}
-        <div className="pointer-events-none absolute -top-12 right-0 size-32 rounded-full bg-gradient-to-br from-violet-200/40 to-fuchsia-200/40 blur-2xl transition-opacity group-hover:opacity-100 dark:from-violet-500/15 dark:to-fuchsia-500/15" />
-
         <div className="relative p-5">
           <div className="flex items-start justify-between gap-3">
-            <div className="relative">
-              <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-400 opacity-60 blur-[2px] dark:from-violet-500 dark:to-fuchsia-500" />
-              <Avatar className="relative size-12 ring-2 ring-background">
-                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-sm font-bold">
-                  {initials(contact.name) || "?"}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+            <Avatar className="relative size-12 ring-2 ring-background">
+              <AvatarFallback className="bg-muted text-foreground text-sm font-medium">
+                {initials(contact.name) || "?"}
+              </AvatarFallback>
+            </Avatar>
             <SourceBadge source={contact.source} />
           </div>
 
@@ -1312,7 +1293,7 @@ function ContactGridCard({
               <a
                 href={`mailto:${contact.email}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-violet-600 dark:hover:text-violet-300"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
                 <Mail className="size-3" />
                 <span className="truncate max-w-[180px]">{contact.email}</span>
@@ -1327,7 +1308,7 @@ function ContactGridCard({
           {/* Stats footer */}
           <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <MessageSquare className="size-3.5 text-violet-500 dark:text-violet-300" />
+              <MessageSquare className="size-3.5 text-muted-foreground" />
               <span className="font-medium text-foreground">
                 {contact.conversationCount ?? 0}
               </span>
@@ -1346,7 +1327,7 @@ function ContactGridCard({
           </div>
 
           {/* Hover quick actions overlay */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-center gap-2 bg-gradient-to-t from-background via-background/95 to-transparent p-3 pt-8 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-center gap-2 border-t bg-card p-3 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
             <Button
               size="sm"
               variant="outline"
