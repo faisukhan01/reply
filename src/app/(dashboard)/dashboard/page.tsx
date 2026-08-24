@@ -60,10 +60,19 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   const orgId = user?.orgId ?? "";
 
-  const bot = await db.chatbot.findFirst({
-    where: { orgId },
-    select: { id: true, name: true },
-  });
+  // Wrap the DB lookup in try/catch so the page renders with empty defaults
+  // if the DB is unreachable (e.g. demo mode with expired Turso token, or
+  // a demo user whose orgId doesn't exist in the real DB). Without this,
+  // the page throws HTTP 500 on /dashboard.
+  let bot: { id: string; name: string } | null = null;
+  try {
+    bot = await db.chatbot.findFirst({
+      where: { orgId },
+      select: { id: true, name: true },
+    });
+  } catch (err) {
+    console.error("[dashboard] DB unreachable, rendering empty state:", err);
+  }
 
   // Default empty metrics
   let totalConversations = 0;
